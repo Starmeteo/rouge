@@ -5,13 +5,7 @@ target/
 .kotlin
 
 ### IntelliJ IDEA ###
-.idea/modules.xml
-.idea/jarRepositories.xml
-.idea/compiler.xml
-.idea/libraries/
-*.iws
-*.iml
-*.ipr
+.idea/
 
 ### Eclipse ###
 .apt_generated
@@ -37,3 +31,9 @@ build/
 
 ### Mac OS ###
 .DS_Store
+
+### 项目文档（不随代码仓库分发） ###
+需求说明书.docx
+
+### Office / WPS 临时文件（打开文档时自动生成，如 ~$需求说明书.docx） ###
+~$*
