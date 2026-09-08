@@ -1,0 +1,235 @@
+/* 《双界行者》全局样式表 —— 「深蓝夜空」主题
+ * 设计理念（需求 §3.1、§8.4）：核心是「光 / 影」两界并存与相互映照。
+ * 参考静谧的深蓝夜色：天际泛着深蓝渐变、星光点点，一束白色光弧划空，
+ * 并在下方水面形成粼粼倒影 —— 光与影在这片夜里交相辉映。
+ * 主菜单的夜空/光弧/水面动效由 MainMenuView 的 Canvas 实时绘制；本表负责前景配色。 */
+
+.root {
+    -fx-font-family: "Microsoft YaHei", "PingFang SC", "Noto Sans CJK SC", "sans-serif";
+    -fx-background-color: #040a1a;
+}
+
+/* ==================== 登录界面（深蓝天际 → 水面） ==================== */
+
+.login-pane {
+    -fx-background-color: linear-gradient(to bottom,
+            #0a1a3e 0%,
+            #16335f 42%,
+            #1f427a 56%,
+            #0e2248 70%,
+            #030a1c 100%);
+}
+
+.login-title {
+    -fx-font-size: 56px;
+    -fx-font-weight: bold;
+    -fx-text-fill: #ffffff;
+    -fx-effect: dropshadow(gaussian, rgba(0, 0, 0, 0.9), 7, 0.55, 0, 2),
+        dropshadow(gaussian, rgba(120, 170, 230, 0.45), 26, 0.4, 0, 2);
+}
+
+.login-subtitle {
+    -fx-font-size: 20px;
+    -fx-text-fill: #a9c2e8;
+}
+
+.login-input {
+    -fx-font-size: 17px;
+    -fx-background-color: rgba(8, 16, 40, 0.86);
+    -fx-background-radius: 8;
+    -fx-border-color: #6d93c8;
+    -fx-border-width: 1px;
+    -fx-border-radius: 8;
+    -fx-text-fill: #eef5ff;
+    -fx-prompt-text-fill: #9ab4dd;
+    -fx-padding: 10 14 10 14;
+}
+
+.login-input:focused {
+    -fx-border-color: #cfe3ff;
+}
+
+/* ==================== 主菜单（夜景画布之上叠加前景） ==================== */
+
+.main-menu-pane {
+    /* 夜空画布盖满整窗，此处仅作兜底底色 */
+    -fx-background-color: linear-gradient(to bottom, #0a1a3e 0%, #16335f 42%, #030a1c 100%);
+}
+
+/* 主标题：白色 + 深蓝投影（在夜景上清晰），辅以淡蓝辉光 */
+.menu-title {
+    -fx-font-size: 84px;
+    -fx-font-weight: bold;
+    -fx-text-fill: #ffffff;
+    -fx-effect: dropshadow(gaussian, rgba(0, 0, 0, 0.9), 7, 0.55, 0, 2),
+        dropshadow(gaussian, rgba(120, 170, 230, 0.5), 30, 0.4, 0, 2);
+}
+
+.menu-subtitle {
+    -fx-font-size: 19px;
+    -fx-text-fill: #a9c2e8;
+}
+
+/* 标题与按钮之间的白→蓝渐变分隔线 */
+.menu-divider {
+    -fx-min-height: 2px;
+    -fx-max-height: 2px;
+    -fx-min-width: 360px;
+    -fx-max-width: 360px;
+    -fx-background-color: linear-gradient(to right,
+            rgba(255, 255, 255, 0.0), rgba(255, 255, 255, 0.9) 30%,
+            #ffffff 50%, rgba(110, 150, 210, 0.9) 70%, rgba(110, 150, 210, 0.0));
+}
+
+/* 菜单按钮：深蓝玻璃面板 + 亮边；悬停提亮 + 白色辉光 */
+.menu-button {
+    -fx-font-size: 22px;
+    -fx-min-width: 320px;
+    -fx-min-height: 58px;
+    -fx-background-color: rgba(8, 16, 38, 0.82);
+    -fx-background-radius: 10;
+    -fx-border-color: #7ea8e0;
+    -fx-border-width: 1px;
+    -fx-border-radius: 10;
+    -fx-text-fill: #eaf2ff;
+    -fx-cursor: hand;
+    -fx-padding: 8 24 8 24;
+    -fx-effect: dropshadow(gaussian, rgba(0, 0, 0, 0.45), 16, 0.4, 0, 4);
+}
+
+.menu-button:hover {
+    -fx-background-color: linear-gradient(to bottom, #2c5488, #1a3a66);
+    -fx-border-color: #cfe3ff;
+    -fx-text-fill: #ffffff;
+    -fx-effect: dropshadow(gaussian, rgba(170, 205, 245, 0.6), 28, 0.5, 0, 0);
+}
+
+.menu-button:pressed {
+    -fx-background-color: #0e2246;
+    -fx-text-fill: #cfe0ff;
+    -fx-effect: dropshadow(gaussian, rgba(120, 170, 230, 0.35), 14, 0.4, 0, 0);
+}
+
+.menu-button:focused {
+    -fx-border-color: #cfe3ff;
+}
+
+/* 按钮前置符文光标（悬停时淡入，由代码控制透明度；固定宽度不参与文本居中） */
+.menu-cursor {
+    -fx-font-size: 18px;
+    -fx-text-fill: #ffffff;
+    -fx-alignment: center;
+}
+
+/* 按钮文本（置于光标与占位之间，严格居中）；悬停/按下时颜色与按钮文字一致 */
+.menu-button-label {
+    -fx-font-size: 22px;
+    -fx-text-fill: #eaf2ff;
+}
+
+.menu-button:hover .menu-button-label {
+    -fx-text-fill: #ffffff;
+}
+
+.menu-button:pressed .menu-button-label {
+    -fx-text-fill: #cfe0ff;
+}
+
+/* 底部版本信息 */
+.menu-footer {
+    -fx-font-size: 13px;
+    -fx-text-fill: #7f97c0;
+}
+
+/* 双界过渡遮罩（开始游戏 / 退出时渐入，由代码控制透明度） */
+.menu-overlay {
+    -fx-background-color: linear-gradient(to bottom,
+            rgba(6, 12, 30, 0.94), rgba(2, 6, 18, 0.97));
+}
+
+/* ==================== 覆盖层（道具图鉴 / 设置，无边框设计） ==================== */
+
+.overlay-panel {
+    -fx-spacing: 20px;
+    /* 深蓝半透底，保证覆盖层内的文字在夜景色上清晰可读 */
+    -fx-background-color: rgba(6, 12, 28, 0.78);
+    -fx-background-radius: 16;
+    -fx-padding: 30 36 30 36;
+}
+
+.overlay-title {
+    -fx-font-size: 30px;
+    -fx-font-weight: bold;
+    -fx-text-fill: linear-gradient(to bottom, #ffffff 0%, #bcd4f5 55%, #86a8d8 100%);
+}
+
+/* 键位/分类胶囊：亮底 + 深蓝字，清晰醒目 */
+.keyboard-key {
+    -fx-font-size: 15px;
+    -fx-text-fill: #0b1c3a;
+    -fx-background-color: rgba(234, 242, 255, 0.94);
+    -fx-background-radius: 6;
+    -fx-border-color: #bcd4f5;
+    -fx-border-width: 1px;
+    -fx-border-radius: 6;
+    -fx-padding: 4 12 4 12;
+}
+
+/* 道具图鉴：说明文字 */
+.help-desc {
+    -fx-font-size: 16px;
+    -fx-text-fill: #d5e3ff;
+}
+
+/* 通用小字提示（说明/设置底部） */
+.hint-text {
+    -fx-font-size: 13px;
+    -fx-text-fill: #8ea6cf;
+}
+
+/* ==================== 设置面板 ==================== */
+
+.settings-label {
+    -fx-font-size: 16px;
+    -fx-text-fill: #eaf2ff;
+}
+
+.settings-value {
+    -fx-font-size: 15px;
+    -fx-text-fill: #cfe0ff;
+    -fx-min-width: 56px;
+}
+
+/* 滑块：蓝轨 + 白拇指 */
+.settings-slider .track {
+    -fx-background-color: #1f3f70;
+    -fx-background-radius: 4;
+}
+
+.settings-slider .thumb {
+    -fx-background-color: #ffffff;
+}
+
+/* 随机种子输入框 */
+.settings-seed-field {
+    -fx-font-size: 15px;
+    -fx-background-color: rgba(8, 16, 40, 0.92);
+    -fx-background-radius: 6;
+    -fx-border-color: #6d93c8;
+    -fx-border-width: 1px;
+    -fx-border-radius: 6;
+    -fx-text-fill: #eef5ff;
+    -fx-prompt-text-fill: #9ab4dd;
+}
+
+/* ==================== 暂停 ==================== */
+
+.pause-pane {
+    -fx-background-color: rgba(4, 9, 24, 0.92);
+}
+
+.pause-title {
+    -fx-font-size: 46px;
+    -fx-font-weight: bold;
+    -fx-text-fill: linear-gradient(to bottom, #ffffff 0%, #c9ddff 60%, #8fb2e2 100%);
+}

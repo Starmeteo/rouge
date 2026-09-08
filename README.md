@@ -1,11 +1,13 @@
-# 幻境回廊（Rouge）
+# 双界行者（Dual World Walker）
 
-> 基于 **JavaFX** 的俯视角动作肉鸽（Roguelike）游戏可玩原型，玩法参考《以撒的结合》。
-> 强调**随机性**（随机地图 / 随机敌人 / 随机道具）、**永久死亡**与**战斗手感**。
+> 基于 **JavaFX** 的俯视角、单机、**双世界切换** Roguelike 动作射击游戏可玩原型（《双界行者》）。
+> 核心机制（需求 §2）：每个房间同时存在**光之界**与**影之界**，玩家不断穿梭两界才能看清全局、
+> 找到通路、击败所有敌人；光形态远程 + 影形态近战。
 
-- 开发周期：10 个工作日（详见《需求说明书.docx》）
-- 当前进度：**第 1 天交付 + 界面优化完成**（可打开项目并显示主菜单，游戏主循环已跑通）
-- 详细设计：需求说明书 v1.0（项目根目录 `需求说明书.docx`）
+- 开发周期：10 天完成可玩 Demo（单层级，见《双界行者》项目需求说明书.md）
+- 当前进度：**架构对齐（第 1 天）+ 双界主题重构** —— 已完成 `com.phantomcorridor` 分层结构、
+  `SceneManager`、登录界面、主菜单、游戏主循环与暂停，并按「双界（光/影）」主题重构 UI 样式与动效。
+- 详细设计：`《双界行者》项目需求说明书.md`
 
 ---
 
@@ -13,10 +15,10 @@
 
 | 组件 | 版本 | 说明 |
 |---|---|---|
-| Java | 21（项目以 `--release 21` 编译） | 满足需求书「JDK 17+」要求 |
-| JavaFX | 21.0.6 | 满足需求书「JavaFX 17 或更高」 |
+| Java | 21（以 `--release 21` 编译） | 满足需求「JDK 17+」要求 |
+| JavaFX | 21.0.6 | 满足需求「JavaFX 17+」要求 |
 | Maven | 3.9（内置 `mvnw` / `mvnw.cmd` wrapper） | 无需单独安装 Maven |
-| JUnit | 5.12.1 | 已配置，测试将在地图生成（第 4 天起）阶段编写 |
+| JUnit | 5.12.1 | 已配置，测试将在地图生成（第 5 天起）阶段编写 |
 
 ---
 
@@ -36,13 +38,10 @@ mvnw.cmd javafx:run
 ./mvnw javafx:run
 ```
 
-或者使用 **IntelliJ IDEA**：
+或使用 **IntelliJ IDEA**：
 1. `File → Open` 选择项目根目录（Maven 自动导入依赖）；
 2. 将 Project SDK 设为 JDK 21；
-3. 右侧 `Maven → javafx → javafx:run` 运行；
-4. 或直接运行 `org.example.rouge.Launcher` / `GameApplication`。
-
-> 当前 JavaFX 依赖已在本地仓库缓存时，也可用 `java --module-path ...` 直接启动（见 IDEA 配置）。
+3. 运行 `com.phantomcorridor.Launcher` / `com.phantomcorridor.App`。
 
 ---
 
@@ -50,44 +49,44 @@ mvnw.cmd javafx:run
 
 | 操作 | 按键 | 状态 |
 |---|---|---|
+| 登录确认 | 进入按钮 / Enter | ✅ 已实现 |
 | 菜单确认 | 鼠标左键 / Enter / 方向键聚焦 | ✅ 已实现 |
 | 暂停 / 继续 | Esc / P | ✅ 已实现 |
 | 切换全屏 | F11 / Alt+Enter | ✅ 已实现 |
-| 移动 | WASD / 方向键 | 🔜 第 2 天 |
+| 移动 | WASD / 方向键 | 🔜 第 3 天 |
 | 瞄准 / 射击 | 鼠标 / 左键连发 | 🔜 第 3 天 |
-
-*游戏内"操作说明"面板会随功能开发同步完善。*
+| 切换世界（光/影） | Shift | 🔜 第 4 天 |
 
 ---
 
 ## 当前进度（开发日志）
 
-### ✅ 第 0~1 天：环境搭建 + 空窗口 + 主菜单雏形 + 游戏主循环
+### ✅ 第 1 天：架构对齐 + 双界主题重构
 
-- **工程搭建**：Maven 工程、JavaFX 21 / JUnit 5 依赖、模块化（`module-info.java`）、`mvnw` wrapper
-- **主窗口**：1280×960 固定逻辑分辨率，F11 / Alt+Enter 全屏切换（屏蔽 Esc 退全屏，避免与暂停键冲突）
-- **主菜单「血月旅人」主题**（参考 Hades / Dark Souls / 以撒的暗黑系设计）：
-  - 半轮**血月**辉光 + 漂浮**余烬**粒子（面板隐藏时动画自动停止）
-  - 橙金渐变标题 + 暗红细边按钮 + 底部版本小字
-  - **动效**：入场错峰淡入、按钮悬停放大 + ✦ 符文光标、点击"开始游戏"时血月逼近 + 血色遮罩渐入 + 余烬加速上浮、退出渐暗
-- **操作说明**：无边框键位表（行式追加，随开发持续完善）
-- **设置面板**：鼠标灵敏度 / 音效音量 / 音乐音量 / 开发随机种子（FR-19 入口预留），各项随对应功能落地生效
-- **游戏主循环** `core.GameLoop`：`AnimationTimer` + **固定时间步长 60Hz** + 帧时间上限防追帧 + FPS 采样
-- **游戏画面** `ui.GamePane`：Canvas 占位渲染（调试小球验证更新→渲染管线），Esc/P 暂停
+- **工程对齐**：包名迁移为 `com.phantomcorridor`；Maven 模块 `module-info` 更新（仅 `requires javafx.controls`，移除不必要的 FXML 依赖）；JavaFX 21 / JUnit 5；`mvnw` wrapper
+- **分层结构**（对应新需求 §9.1）：
+  - `config` —— `AppConfig`（窗口/标题/帧率）、`GameConfig`（玩家属性/相位能量回复）、`RoomConfig`（房间尺寸/房间类型权重）、`Settings`（灵敏度/音量/种子/昵称）
+  - `controller` —— `SceneManager`（统一场景切换 §9.3）
+  - `core` —— `GameLoop`（AnimationTimer 固定 60Hz 步长主循环）、`GameState`（LOGIN/MAIN_MENU/PLAYING/PAUSED/GAME_OVER）
+  - `model` —— 数据契约枚举 `WorldType`（光/影）、`RoomType`（入口/战斗/奖励/商店/事件/Boss）、`ItemType`（光/影/双/通用）；`entity/room/dungeon/combat/ai/effect` 子包已立（§9.1 规划）
+  - `util` —— `CollisionUtil`（圆-圆/圆-矩形/点-矩形）、`RandomUtil`（区间/权重随机、固定种子复现）、`AssetLoader`（资源加载）
+  - `view` —— `LoginView`（§8.1 登录：昵称 + 本地密码）、`MainMenuView`（§8.2 主菜单）、`GameView`（Canvas + 游戏主循环）、`PauseView`（暂停）、`SettingsOverlay`（设置）
+- **双界主题（光/影）**：左上**光之界**暖金辉光球 + 右下**影之界**冷紫辉光球，标题金→紫渐变字色，按钮影紫面板 + 悬停影紫渐变填充、金光文字；余烬粒子交替光金/影紫
+- **按钮动效（参考原项目保留）**：悬停放大 + 前置符文光标 ✦ 淡入；菜单入场错峰淡入上浮；覆盖层滑入滑出；开始游戏双界辉光球放大逼近 + 双界遮罩渐入
 
-### 📅 后续开发计划（需求书 §7）
+### 📅 后续开发计划（《双界行者》需求 §11）
 
 | 天 | 内容 | 里程碑 |
 |---|---|---|
-| 第 2 天 | 玩家圆形实体移动、房间墙体绘制、碰撞限制 | M1（第 4 天）：随机房间中移动/射击/杀敌/切房间 |
-| 第 3 天 | 鼠标射击、子弹移动与碰撞、基础敌人史莱姆 | |
-| 第 4 天 | 房间生成网格、门、房间切换、清空敌人开门 | |
-| 第 5 天 | 敌人 AI 扩展：弓兵、冲锋怪、蝙蝠 | |
-| 第 6 天 | 道具系统与 HUD（拾取、属性变化、显示） | |
-| 第 7 天 | Boss 房、Boss AI、进入下一层 | M2（第 7 天）：完整房间—道具—Boss—下一层循环 |
-| 第 8 天 | 死亡/胜利/暂停界面完善、音效 | |
-| 第 9 天 | 平衡性调整、Bug 修复、逐项测试 | |
-| 第 10 天 | 最终验收、README 完善、演示视频 | M3（交付） |
+| 第 2 天 | 登录界面 + 主菜单界面 | 登录后可进入主菜单（本阶段已含） |
+| 第 3 天 | 玩家移动、角色渲染、攻击基本动作 | 玩家可移动和攻击 |
+| 第 4 天 | 双世界切换（视觉变化 + 相位能量限制） | 可按 Shift 切换世界 |
+| 第 5 天 | 地图生成算法、房间连接、墙壁碰撞、门禁逻辑 | 随机地图并进出房间 |
+| 第 6 天 | 普通敌人 AI 与双世界可见性逻辑 | 光/影敌人分别可攻击 |
+| 第 7 天 | 战斗房清理规则、宝箱、出口开启、基础道具掉落 | 房间完整流程打通 |
+| 第 8 天 | Boss 战：双阶段跨世界机制 | Boss 可被击败 |
+| 第 9 天 | 完善 HUD、场景过渡、死亡界面、重新开始 | 一局完整可玩 Demo |
+| 第 10 天 | 数值平衡、Bug 修复、打包交付 | 可演示版本 |
 
 ---
 
@@ -96,24 +95,41 @@ mvnw.cmd javafx:run
 ```
 src/main/java
 ├── module-info.java              // 模块声明（requires javafx.controls）
-└── org/example/rouge
-    ├── Launcher.java             // 启动入口
-    ├── GameApplication.java      // JavaFX Application 主类 + 界面流转编排
-    ├── core/                     // 游戏主循环 / 状态 / 设置
+└── com/phantomcorridor
+    ├── Launcher.java             // 程序入口
+    ├── App.java                  // JavaFX Application 主类 + 场景流转编排
+    ├── config/                   // 各配置常量（魔法数值集中管理）
+    │   ├── AppConfig.java        // 窗口尺寸、标题、帧率
+    │   ├── GameConfig.java       // 玩家属性、相位能量回复参数
+    │   ├── RoomConfig.java       // 房间大小、房间类型权重
+    │   └── Settings.java         // 全局设置（灵敏度/音量/种子/昵称）
+    ├── controller/
+    │   └── SceneManager.java     // 统一场景切换（§9.3）
+    ├── core/
     │   ├── GameLoop.java         // AnimationTimer 固定时间步长主循环
-    │   ├── GameState.java        // 界面状态（主菜单/运行/暂停）
-    │   └── Settings.java         // 全局设置（灵敏度/音量/开发种子）
-    ├── model/                    // 数据模型（Player/Enemy/... 按天开发）*规划中*
-    ├── generator/                // 地图生成（第 4 天）*规划中*
-    ├── ai/                       // 敌人 AI（第 3/5/7 天）*规划中*
-    ├── collision/                // 碰撞检测工具（第 2 天）*规划中*
-    └── ui/                       // 界面层
-        ├── MainMenuPane.java     // 主菜单（血月旅人主题 + 动效）
-        ├── SettingsPane.java     // 设置面板
-        ├── GamePane.java         // Canvas 游戏画面（占位渲染）
-        └── PausePane.java        // 暂停面板
+    │   └── GameState.java        // 界面状态（登录/主菜单/运行/暂停/结算）
+    ├── model/
+    │   ├── WorldType.java        // 光之界 / 影之界
+    │   ├── RoomType.java         // 入口/战斗/奖励/商店/事件/Boss
+    │   ├── ItemType.java         // 光/影/双/通用
+    │   ├── entity/               // Player/Enemy/Bullet/ItemPickup（规划）
+    │   ├── room/                 // Room/Door（规划）
+    │   ├── dungeon/              // MapGenerator/NodeGraph（规划）
+    │   ├── combat/               // BulletManager/DamageCalculator（规划）
+    │   ├── ai/                   // IdleAI/ChaseAI/AttackAI（规划）
+    │   └── effect/               // ItemEffect/WorldShiftEffect（规划）
+    ├── util/
+    │   ├── CollisionUtil.java    // 圆-圆/圆-矩形/点-矩形碰撞
+    │   ├── RandomUtil.java       // 区间/权重随机、固定种子复现
+    │   └── AssetLoader.java      // 类路径资源加载
+    └── view/
+        ├── LoginView.java        // 登录界面（昵称 + 本地密码）
+        ├── MainMenuView.java     // 主菜单（双界主题）
+        ├── GameView.java         // Canvas 游戏画面（占位渲染）
+        ├── PauseView.java        // 暂停面板
+        └── SettingsOverlay.java  // 设置覆盖层
 src/main/resources
-└── org/example/rouge/ui/ui.css   // 全局样式（血月旅人主题）
+└── com/phantomcorridor/ui/ui.css // 全局样式（黑白交融 · 双界主题）
 ```
 
 *每个包均带 `package-info.java` 说明包职责与规划，方便团队协作。*
@@ -122,18 +138,18 @@ src/main/resources
 
 ## 架构要点
 
-- **模型与渲染分离**：`model` 包为纯 POJO，不依赖 JavaFX 节点；渲染统一走 Canvas
-- **固定时间步长**：逻辑更新恒定 1/60s，与显示器刷新率解耦，保证手感一致（需求 §8 风险对策）
-- **碰撞集中化**：`collision.CollisionUtil` 承载全部几何判定（第 2 天起使用）
-- **Canvas 渲染**：适合大量弹体/实体，后续子弹数量上限 300 + 对象池（需求 §8）
-- **随机种子**：设置面板已预留开发模式种子输入（FR-19），第 4 天地图生成接入，便于复现地图与调试
+- **模型与渲染分离**：`model` 包为纯 POJO，不依赖 JavaFX 节点；渲染统一走 Canvas（§9.2）
+- **固定时间步长**：核心 `GameLoop` 逻辑更新恒定 1/60s，与刷新率解耦（$3.3 手感保障）
+- **碰撞集中化**：`util.CollisionUtil` 承载全部几何判定
+- **场景统一切换**：`controller.SceneManager.switchTo(view)` 集中处理界面流转（§9.3）
+- **双世界契约**：`model.WorldType` 贯穿玩家/敌人/子弹，跨世界伤害与可见性由 `combat.DamageCalculator` 收敛
 
 ## 协作约定
 
 - 代码遵循统一规范：类 PascalCase、常量 UPPER_SNAKE、方法 camelCase、4 空格缩进、行宽 ≤120
 - 公开类/方法必须写 JavaDoc，关键逻辑行内中文注释（注释引用需求条目便于回溯）
-- 每日按需求书 §7 的开发计划推进，**当天只做当天内容，优先打磨已交付功能**
+- 每日按《双界行者》需求 §11 的开发计划推进，**当天只做当天内容，优先打磨已交付功能**
 
 ---
 
-*本项目为团队协作的可玩原型/演示版本，暂不包含联网、存档、手柄等高级需求（见需求说明书 §1.4）。*
+*本项目为团队协作的可玩原型/演示版本，暂无联网、存档、手柄等高级需求（见《双界行者》需求说明书 §1.4、§4.3）。*
