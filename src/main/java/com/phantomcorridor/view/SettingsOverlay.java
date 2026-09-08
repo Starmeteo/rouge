@@ -107,7 +107,7 @@ public class SettingsOverlay extends VBox {
         nicknameLabelBox.getStyleClass().add("settings-label");
         nicknameLabelBox.setMinWidth(LABEL_MIN_WIDTH);
         nicknameLabel.getStyleClass().add("settings-value");
-        refreshNickname();
+        refreshProfile();
         HBox nicknameRow = new HBox(14.0, nicknameLabelBox, nicknameLabel);
         nicknameRow.setAlignment(Pos.CENTER);
         nicknameRow.setMaxWidth(HBox.USE_PREF_SIZE);
@@ -159,7 +159,7 @@ public class SettingsOverlay extends VBox {
     }
 
     /** 刷新昵称只读展示文本 */
-    private void refreshNickname() {
+    public void refreshProfile() {
         String nickname = nicknameSupplier.get();
         nicknameLabel.setText(nickname == null || nickname.isEmpty() ? "（未设置）" : nickname);
     }
@@ -171,7 +171,7 @@ public class SettingsOverlay extends VBox {
         sfxSlider.setValue(settings.getSfxVolume() * 100.0);
         musicSlider.setValue(settings.getMusicVolume() * 100.0);
         seedField.setText(settings.getDevSeed());
-        refreshNickname();
+        refreshProfile();
     }
 
     /** 创建与主菜单一致的菜单按钮（样式类复用 ui.css 的 .menu-button） */

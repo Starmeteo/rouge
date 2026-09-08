@@ -216,7 +216,17 @@
 }
 
 .pause-pane {
-    -fx-background-color: radial-gradient(center 50% 45%, radius 68%, #1b1226, #050409);
+    -fx-background-color: rgba(3, 2, 7, 0.58);
+}
+
+.pause-card {
+    -fx-background-color: rgba(10, 8, 15, 0.90);
+    -fx-background-radius: 5px;
+    -fx-border-color: linear-gradient(to right, rgba(232, 189, 104, 0.72), rgba(155, 101, 220, 0.72));
+    -fx-border-radius: 5px;
+    -fx-border-width: 1px;
+    -fx-padding: 44px 62px;
+    -fx-effect: dropshadow(gaussian, rgba(0, 0, 0, 0.75), 32, 0.42, 0, 10);
 }
 
 .world-shift-flash {

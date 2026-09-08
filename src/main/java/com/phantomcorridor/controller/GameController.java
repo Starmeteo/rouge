@@ -4,6 +4,7 @@ import com.phantomcorridor.core.GameLoop;
 import com.phantomcorridor.model.GameSession;
 import com.phantomcorridor.view.GameView;
 import javafx.scene.input.KeyCode;
+import com.phantomcorridor.config.Settings;
 
 /** 游戏输入、模型更新和渲染调度。 */
 public final class GameController {
@@ -15,14 +16,19 @@ public final class GameController {
     private final GameLoop loop;
     private boolean running;
     private boolean shiftHeld;
+    private boolean attackHeld;
+    private double aimX;
+    private double aimY;
+    private final Settings settings;
 
-    public GameController(GameView view, Runnable onPauseRequested) {
+    public GameController(GameView view, Runnable onPauseRequested, Settings settings) {
         this.view = view;
         this.onPauseRequested = onPauseRequested;
+        this.settings = settings;
         this.loop = new GameLoop() {
             @Override
             protected void update(double dt) {
-                session.update(dt, input.horizontal(), input.vertical());
+                session.update(dt, input.horizontal(), input.vertical(), aimX, aimY, attackHeld);
             }
 
             @Override
@@ -31,14 +37,18 @@ public final class GameController {
             }
         };
         view.bindInput(this::keyPressed, this::keyReleased);
+        view.bindPointer(this::pointerMoved, held -> attackHeld = held);
         view.bindLifecycle(this::start, this::stop);
-        session.newRun();
+        session.newRun(settings.getDevSeed());
     }
 
     public void newRun() {
-        session.newRun();
+        session.newRun(settings.getDevSeed());
         input.clear();
         shiftHeld = false;
+        attackHeld = false;
+        aimX = session.getPlayer().getX() + 1.0;
+        aimY = session.getPlayer().getY();
         view.render(session, 0.0);
     }
 
@@ -56,6 +66,7 @@ public final class GameController {
         }
         input.clear();
         shiftHeld = false;
+        attackHeld = false;
     }
 
     private void keyPressed(KeyCode key) {
@@ -84,5 +95,10 @@ public final class GameController {
             case SHIFT -> shiftHeld = false;
             default -> { }
         }
+    }
+
+    private void pointerMoved(double x, double y) {
+        aimX = x;
+        aimY = y;
     }
 }

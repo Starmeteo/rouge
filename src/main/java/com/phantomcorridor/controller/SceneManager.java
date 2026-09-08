@@ -57,6 +57,26 @@ public final class SceneManager {
         }
     }
 
+    /**
+     * 在当前画面上显示覆盖层。底层节点保留可见但退出生命周期，适合暂停菜单。
+     */
+    public void showOverlay(GameState nextState, Pane overlay) {
+        if (!root.getChildren().contains(overlay)) {
+            throw new IllegalArgumentException("覆盖层尚未注册到根容器");
+        }
+        if (activeView instanceof SceneLifecycle lifecycle) {
+            lifecycle.onExit();
+        }
+        overlay.setManaged(true);
+        overlay.setVisible(true);
+        overlay.toFront();
+        state = nextState;
+        activeView = overlay;
+        if (overlay instanceof SceneLifecycle lifecycle) {
+            lifecycle.onEnter();
+        }
+    }
+
     public GameState state() {
         return state;
     }

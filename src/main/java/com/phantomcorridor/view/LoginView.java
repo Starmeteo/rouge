@@ -62,7 +62,7 @@ public final class LoginView extends StackPane implements SceneLifecycle {
         VBox card = new VBox(34.0, titleRow, fields);
         card.getStyleClass().add("login-card");
         card.setAlignment(Pos.CENTER);
-        card.setMaxWidth(620.0);
+        card.setMaxSize(620.0, VBox.USE_PREF_SIZE);
 
         getChildren().addAll(backdrop, card);
     }

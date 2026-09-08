@@ -5,6 +5,10 @@ import com.phantomcorridor.config.GameConfig;
 import com.phantomcorridor.model.GameSession;
 import com.phantomcorridor.model.WorldType;
 import com.phantomcorridor.model.entity.Player;
+import com.phantomcorridor.model.combat.Projectile;
+import com.phantomcorridor.model.room.Direction;
+import com.phantomcorridor.model.room.Room;
+import com.phantomcorridor.model.room.Wall;
 import javafx.scene.canvas.GraphicsContext;
 import javafx.scene.effect.BlendMode;
 import javafx.scene.paint.Color;
@@ -26,11 +30,68 @@ public final class GameRenderer {
         Player player = session.getPlayer();
         boolean light = player.getCurrentWorld() == WorldType.LIGHT;
         drawFloor(g, light);
-        drawRoom(g, light);
-        drawPhaseWalls(g, light);
+        drawRoom(g, session, light);
+        drawPhaseWalls(g, session, light);
+        drawAttacks(g, session, light);
         drawPlayer(g, player, light);
+        drawPhasePulse(g, session, light);
+        drawAim(g, session, light);
         drawHud(g, session, fps, light);
+        drawMiniMap(g, session, light);
         drawControls(g, light);
+    }
+
+    private void drawPhasePulse(GraphicsContext g, GameSession session, boolean light) {
+        if (!session.isPhasePulseVisible()) return;
+        Player player = session.getPlayer();
+        double radius = GameConfig.PHASE_PULSE_RADIUS;
+        Color color = light ? LIGHT_GOLD : SHADOW_VIOLET;
+        g.setStroke(Color.color(color.getRed(), color.getGreen(), color.getBlue(), 0.74));
+        g.setLineWidth(4.0);
+        g.strokeOval(player.getX() - radius, player.getY() - radius, radius * 2.0, radius * 2.0);
+    }
+
+    private void drawAttacks(GraphicsContext g, GameSession session, boolean light) {
+        for (Projectile projectile : session.getAttackSystem().getProjectiles()) {
+            double radius = projectile.getRadius();
+            g.setGlobalBlendMode(BlendMode.ADD);
+            g.setFill(Color.rgb(255, 220, 138, 0.30));
+            g.fillOval(projectile.getX() - radius * 2.5, projectile.getY() - radius * 2.5,
+                    radius * 5.0, radius * 5.0);
+            g.setGlobalBlendMode(BlendMode.SRC_OVER);
+            g.setFill(Color.web("#fff2bd"));
+            g.fillOval(projectile.getX() - radius, projectile.getY() - radius,
+                    radius * 2.0, radius * 2.0);
+        }
+        if (!light && session.getAttackSystem().isMeleeVisible()) {
+            Player player = session.getPlayer();
+            double angle = Math.toDegrees(session.getAttackSystem().getMeleeAngleRadians());
+            double arc = GameConfig.SHADOW_MELEE_ARC_DEGREES;
+            double range = GameConfig.SHADOW_MELEE_RANGE;
+            g.setStroke(Color.rgb(190, 132, 242, 0.82));
+            g.setLineWidth(10.0);
+            g.strokeArc(player.getX() - range, player.getY() - range, range * 2.0, range * 2.0,
+                    -angle - arc / 2.0, arc, javafx.scene.shape.ArcType.OPEN);
+            g.setStroke(Color.rgb(239, 216, 255, 0.86));
+            g.setLineWidth(2.0);
+            g.strokeArc(player.getX() - range, player.getY() - range, range * 2.0, range * 2.0,
+                    -angle - arc / 2.0, arc, javafx.scene.shape.ArcType.OPEN);
+        }
+    }
+
+    private void drawAim(GraphicsContext g, GameSession session, boolean light) {
+        Player player = session.getPlayer();
+        double dx = session.getAimX() - player.getX();
+        double dy = session.getAimY() - player.getY();
+        double length = Math.hypot(dx, dy);
+        if (length < 0.0001) return;
+        double cursorX = player.getX() + dx / length * 50.0;
+        double cursorY = player.getY() + dy / length * 50.0;
+        Color domain = light ? LIGHT_GOLD : SHADOW_VIOLET;
+        g.setStroke(Color.color(domain.getRed(), domain.getGreen(), domain.getBlue(), 0.48));
+        g.setLineWidth(1.0);
+        g.strokeLine(player.getX(), player.getY(), cursorX, cursorY);
+        g.strokeOval(cursorX - 5.0, cursorY - 5.0, 10.0, 10.0);
     }
 
     private void drawFloor(GraphicsContext g, boolean light) {
@@ -59,7 +120,7 @@ public final class GameRenderer {
         g.fillRect(0, 0, AppConfig.VIEW_WIDTH, AppConfig.VIEW_HEIGHT);
     }
 
-    private void drawRoom(GraphicsContext g, boolean light) {
+    private void drawRoom(GraphicsContext g, GameSession session, boolean light) {
         Color border = light ? Color.web("#8d6d35") : Color.web("#4f3277");
         Color glow = light ? Color.rgb(236, 195, 105, 0.28) : Color.rgb(153, 91, 218, 0.30);
         g.setStroke(glow);
@@ -69,20 +130,61 @@ public final class GameRenderer {
         g.setLineWidth(4.0);
         g.strokeRoundRect(34, 34, AppConfig.VIEW_WIDTH - 68.0, AppConfig.VIEW_HEIGHT - 68.0, 22, 22);
 
-        // 上方封闭门：之后由房间状态驱动开启。
-        double doorX = AppConfig.VIEW_WIDTH / 2.0 - 74.0;
-        g.setFill(Color.rgb(4, 4, 8, 0.88));
-        g.fillRect(doorX, 24, 148, 28);
-        g.setStroke(light ? LIGHT_GOLD : SHADOW_VIOLET);
-        g.setLineWidth(2.0);
-        g.strokeLine(doorX + 10, 51, doorX + 138, 51);
+        for (Direction direction : Direction.values()) {
+            if (session.getNavigation().getCurrentRoom().hasDoor(direction)) {
+                drawDoor(g, direction, session.getNavigation().getCurrentRoom().isDoorOpen(direction), light);
+            }
+        }
     }
 
-    private void drawPhaseWalls(GraphicsContext g, boolean light) {
-        Color active = light ? LIGHT_GOLD : SHADOW_VIOLET;
-        Color inactive = light ? SHADOW_VIOLET : LIGHT_GOLD;
-        drawPhaseWall(g, 235, 245, 26, 310, active, 0.62);
-        drawPhaseWall(g, AppConfig.VIEW_WIDTH - 261, 405, 26, 310, inactive, 0.15);
+    private void drawDoor(GraphicsContext g, Direction direction, boolean open, boolean light) {
+        double half = com.phantomcorridor.config.RoomConfig.DOOR_HALF_WIDTH;
+        double cx = AppConfig.VIEW_WIDTH / 2.0;
+        double cy = AppConfig.VIEW_HEIGHT / 2.0;
+        g.setFill(open ? Color.rgb(12, 9, 18, 0.35) : Color.rgb(4, 4, 8, 0.94));
+        if (direction == Direction.NORTH || direction == Direction.SOUTH) {
+            g.fillRect(cx - half, direction == Direction.NORTH ? 24 : AppConfig.VIEW_HEIGHT - 52,
+                    half * 2.0, 28);
+        } else {
+            g.fillRect(direction == Direction.WEST ? 24 : AppConfig.VIEW_WIDTH - 52,
+                    cy - half, 28, half * 2.0);
+        }
+    }
+
+    private void drawPhaseWalls(GraphicsContext g, GameSession session, boolean light) {
+        for (Wall wall : session.getNavigation().getCurrentRoom().walls()) {
+            boolean active = wall.activeIn(session.getPlayer().getCurrentWorld());
+            Color color = wall.world() == WorldType.LIGHT ? LIGHT_GOLD : SHADOW_VIOLET;
+            drawPhaseWall(g, wall.x(), wall.y(), wall.width(), wall.height(), color, active ? 0.62 : 0.15);
+        }
+    }
+
+    private void drawMiniMap(GraphicsContext g, GameSession session, boolean light) {
+        Room current = session.getNavigation().getCurrentRoom();
+        double originX = AppConfig.VIEW_WIDTH - 210.0;
+        double originY = 205.0;
+        double scale = 24.0;
+        g.setStroke(Color.rgb(220, 210, 225, 0.20));
+        g.setLineWidth(2.0);
+        for (Room room : session.getNavigation().getMap().rooms()) {
+            for (var edge : room.neighbors().entrySet()) {
+                Room neighbor = session.getNavigation().getMap().room(edge.getValue());
+                g.strokeLine(originX + room.mapX() * scale, originY + room.mapY() * scale,
+                        originX + neighbor.mapX() * scale, originY + neighbor.mapY() * scale);
+            }
+        }
+        for (Room room : session.getNavigation().getMap().rooms()) {
+            double x = originX + room.mapX() * scale;
+            double y = originY + room.mapY() * scale;
+            g.setFill(room == current ? (light ? LIGHT_GOLD : SHADOW_VIOLET)
+                    : room.type() == com.phantomcorridor.model.RoomType.BOSS
+                    ? Color.web("#b84e55") : Color.rgb(210, 200, 220, 0.46));
+            g.fillRect(x - 5, y - 5, 10, 10);
+        }
+        g.setFill(Color.rgb(235, 226, 242, 0.62));
+        g.setFont(Font.font("Microsoft YaHei UI", 12));
+        g.fillText("房间 " + (current.id() + 1) + " · " + current.type() + " · 种子 "
+                + session.getDungeonSeed(), originX - 78, originY - 28);
     }
 
     private void drawPhaseWall(GraphicsContext g, double x, double y, double width, double height,
@@ -183,7 +285,7 @@ public final class GameRenderer {
         g.setTextAlign(TextAlignment.CENTER);
         g.setFill(light ? Color.rgb(237, 210, 156, 0.56) : Color.rgb(198, 169, 230, 0.58));
         g.setFont(Font.font("Microsoft YaHei UI", 13));
-        g.fillText("WASD / 方向键移动    ·    SHIFT 穿梭双界    ·    ESC 暂停",
+        g.fillText("WASD / 方向键移动    ·    鼠标瞄准 / 左键攻击    ·    SHIFT 穿梭双界    ·    ESC 暂停",
                 AppConfig.VIEW_WIDTH / 2.0, AppConfig.VIEW_HEIGHT - 24.0);
         g.setTextAlign(TextAlignment.LEFT);
     }

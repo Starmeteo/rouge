@@ -23,6 +23,8 @@ public final class RoomConfig {
 
     /** 房间高度（像素），与逻辑视口一致 */
     public static final double ROOM_HEIGHT = AppConfig.VIEW_HEIGHT;
+    public static final int DEFAULT_ROOM_COUNT = 9;
+    public static final double DOOR_HALF_WIDTH = 74.0;
 
     // ---- 房间类型默认生成权重（第 5 天接入；权重越大越易生成） ----
     /** 入口房间权重（每层固定 1 个，权重仅供占位） */

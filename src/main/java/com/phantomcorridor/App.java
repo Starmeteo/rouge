@@ -63,7 +63,7 @@ public class App extends Application {
 
         // 玩家档案与偏好设置分离，恢复默认设置不会再清空玩家身份。
         Settings settings = new Settings();
-        PlayerProfile profile = new PlayerProfile();
+        PlayerProfile profile = PlayerProfile.loadLocal();
         sceneManager = new SceneManager(root);
 
         LoginController loginController = new LoginController(profile, this::showMainMenu);
@@ -72,7 +72,7 @@ public class App extends Application {
         loginView = loginController.getView();
         mainMenuView = mainMenuController.getView();
         gameView = new GameView();
-        gameController = new GameController(gameView, this::showPause);
+        gameController = new GameController(gameView, this::showPause, settings);
         pauseView = new PauseView(this::resumeGame, this::showMainMenu);
         root.getChildren().addAll(loginView, mainMenuView, gameView, pauseView);
 
@@ -117,7 +117,7 @@ public class App extends Application {
 
     /** 打开暂停界面（游戏中按 Esc/P 或点击暂停） */
     public void showPause() {
-        sceneManager.switchTo(GameState.PAUSED, pauseView);
+        sceneManager.showOverlay(GameState.PAUSED, pauseView);
     }
 
     /** 恢复游戏（暂停界面点击"继续游戏"或按 Esc/P） */

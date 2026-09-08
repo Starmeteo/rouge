@@ -33,7 +33,9 @@ public class PauseView extends StackPane implements SceneLifecycle {
         Button quitButton = createPauseButton("回到主菜单", onQuitToMenu);
 
         VBox box = new VBox(26.0, title, resumeButton, quitButton);
+        box.getStyleClass().add("pause-card");
         box.setAlignment(Pos.CENTER);
+        box.setMaxSize(VBox.USE_PREF_SIZE, VBox.USE_PREF_SIZE);
         getChildren().add(box);
 
         // Esc/P 继续游戏（§4.3）

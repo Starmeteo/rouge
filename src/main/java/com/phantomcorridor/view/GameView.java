@@ -7,11 +7,13 @@ import com.phantomcorridor.model.WorldType;
 import javafx.animation.FadeTransition;
 import javafx.scene.canvas.Canvas;
 import javafx.scene.input.KeyCode;
+import javafx.scene.input.MouseButton;
 import javafx.scene.layout.Region;
 import javafx.scene.layout.StackPane;
 import javafx.util.Duration;
 
 import java.util.function.Consumer;
+import java.util.function.BiConsumer;
 
 /** 游戏视图：负责输入事件转发、Canvas 展示和切界闪屏，不包含业务规则。 */
 public final class GameView extends StackPane implements SceneLifecycle {
@@ -23,6 +25,8 @@ public final class GameView extends StackPane implements SceneLifecycle {
     private final Region shiftFlash = new Region();
     private Consumer<KeyCode> keyPressed = key -> { };
     private Consumer<KeyCode> keyReleased = key -> { };
+    private BiConsumer<Double, Double> pointerMoved = (x, y) -> { };
+    private Consumer<Boolean> attackChanged = attacking -> { };
     private Runnable enterAction = () -> { };
     private Runnable exitAction = () -> { };
 
@@ -38,11 +42,31 @@ public final class GameView extends StackPane implements SceneLifecycle {
 
         setOnKeyPressed(event -> keyPressed.accept(event.getCode()));
         setOnKeyReleased(event -> keyReleased.accept(event.getCode()));
+        setOnMouseMoved(event -> pointerMoved.accept(event.getX(), event.getY()));
+        setOnMouseDragged(event -> pointerMoved.accept(event.getX(), event.getY()));
+        setOnMousePressed(event -> {
+            requestFocus();
+            pointerMoved.accept(event.getX(), event.getY());
+            if (event.getButton() == MouseButton.PRIMARY) {
+                attackChanged.accept(true);
+            }
+        });
+        setOnMouseReleased(event -> {
+            if (event.getButton() == MouseButton.PRIMARY) {
+                attackChanged.accept(false);
+            }
+        });
+        setOnMouseExited(event -> attackChanged.accept(false));
     }
 
     public void bindInput(Consumer<KeyCode> onPressed, Consumer<KeyCode> onReleased) {
         keyPressed = onPressed;
         keyReleased = onReleased;
+    }
+
+    public void bindPointer(BiConsumer<Double, Double> onMoved, Consumer<Boolean> onAttackChanged) {
+        pointerMoved = onMoved;
+        attackChanged = onAttackChanged;
     }
 
     public void bindLifecycle(Runnable onEnter, Runnable onExit) {

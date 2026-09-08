@@ -55,6 +55,11 @@ public final class Player {
         currentWorld = currentWorld == WorldType.LIGHT ? WorldType.SHADOW : WorldType.LIGHT;
     }
 
+    public void setPosition(double x, double y) {
+        this.x = x;
+        this.y = y;
+    }
+
     public int getHp() { return hp; }
     public double getX() { return x; }
     public double getY() { return y; }

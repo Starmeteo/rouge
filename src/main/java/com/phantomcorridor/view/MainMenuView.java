@@ -165,6 +165,8 @@ public class MainMenuView extends StackPane implements SceneLifecycle {
         VBox box = new VBox(22.0, header, divider, startButton, galleryButton, settingsButton, quitButton);
         box.getStyleClass().add("menu-panel");
         box.setAlignment(Pos.CENTER);
+        box.setFillWidth(false);
+        box.setMaxSize(VBox.USE_PREF_SIZE, VBox.USE_PREF_SIZE);
         box.setPadding(new Insets(40.0));
         return box;
     }
@@ -289,6 +291,9 @@ public class MainMenuView extends StackPane implements SceneLifecycle {
             return;
         }
         transitionLocked = true;
+        if (panel instanceof SettingsOverlay settingsOverlay) {
+            settingsOverlay.refreshProfile();
+        }
         FadeTransition out = new FadeTransition(Duration.millis(150.0), menuContent);
         out.setToValue(0.0);
         out.setOnFinished(event -> {

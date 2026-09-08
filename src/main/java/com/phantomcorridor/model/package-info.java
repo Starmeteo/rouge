@@ -5,7 +5,7 @@
  * <ul>
  *   <li>{@link com.phantomcorridor.model.entity} —— 实体：Player / Enemy / Bullet / ItemPickup（§3.2、§6）；</li>
  *   <li>{@link com.phantomcorridor.model.room} —— 房间：Room / Door（§5.3）；{@link com.phantomcorridor.model.RoomType} 亦属房间概念；</li>
- *   <li>{@link com.phantomcorridor.model.dungeon} —— 地图生成：MapGenerator / NodeGraph（§5.1）；</li>
+ *   <li>{@link com.phantomcorridor.model.dungeon} —— 地图生成：MapGenerator / DungeonMap（§5.1）；</li>
  *   <li>{@link com.phantomcorridor.model.combat} —— 战斗逻辑：BulletManager / DamageCalculator（§6.2）；</li>
  *   <li>{@link com.phantomcorridor.model.ai} —— 敌人 AI：IdleAI / ChaseAI / AttackAI（§6.3）；</li>
  *   <li>{@link com.phantomcorridor.model.effect} —— 道具效果：ItemEffect / WorldShiftEffect（§7）。</li>

@@ -29,7 +29,21 @@ public final class LoginController {
             view.showError("昵称最多 16 个字符");
             return;
         }
+        if (profile.exists()) {
+            if (!profile.getNickname().equals(normalized)) {
+                view.showError("本地档案昵称不匹配");
+                return;
+            }
+            if (!profile.passwordMatches(password)) {
+                view.showError("本地密码错误");
+                return;
+            }
+            view.clearError();
+            onLoggedIn.run();
+            return;
+        }
         profile.updateCredentials(normalized, password);
+        profile.saveLocal();
         view.clearError();
         onLoggedIn.run();
     }

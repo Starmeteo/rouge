@@ -24,6 +24,16 @@ public final class GameConfig {
     /** 影形态额外移动速度加成倍率（§3.2 影形态"移动略快"，占位） */
     public static final double SHADOW_SPEED_MULTIPLIER = 1.15;
 
+    // ---- 第 3 天：双形态攻击 ----
+    public static final double LIGHT_PROJECTILE_SPEED = 560.0;
+    public static final double LIGHT_PROJECTILE_RADIUS = 6.0;
+    public static final double LIGHT_PROJECTILE_LIFETIME = 1.8;
+    public static final double LIGHT_ATTACK_COOLDOWN = 0.22;
+    public static final double SHADOW_MELEE_RANGE = 92.0;
+    public static final double SHADOW_MELEE_ARC_DEGREES = 110.0;
+    public static final double SHADOW_MELEE_VISIBLE_TIME = 0.13;
+    public static final double SHADOW_ATTACK_COOLDOWN = 0.15;
+
     // ---- 玩家生命 ----
     /** 玩家最大生命值（需求未对双界版给出明确数值，沿用旧版 3 点作为占位，待 §7.2 道具加成时校调） */
     public static final int PLAYER_MAX_HP = 3;
@@ -52,6 +62,12 @@ public final class GameConfig {
 
     /** 切换世界后的冷却时间（秒，占位；§3.3"切换后进入冷却恢复期"） */
     public static final double WORLD_SWITCH_COOLDOWN = 0.6;
+
+    /** 切界脉冲清除玩家周围敌方弹幕的半径。 */
+    public static final double PHASE_PULSE_RADIUS = 118.0;
+
+    /** 切界脉冲圆环的显示时间。 */
+    public static final double PHASE_PULSE_VISIBLE_TIME = 0.32;
 
     /** 工具类：不允许实例化 */
     private GameConfig() {
