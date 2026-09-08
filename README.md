@@ -5,8 +5,8 @@
 > 找到通路、击败所有敌人；光形态远程 + 影形态近战。
 
 - 开发周期：10 天完成可玩 Demo（单层级，见《双界行者》项目需求说明书.md）
-- 当前进度：**架构对齐（第 1 天）+ 双界主题重构** —— 已完成 `com.phantomcorridor` 分层结构、
-  `SceneManager`、登录界面、主菜单、游戏主循环与暂停，并按「双界（光/影）」主题重构 UI 样式与动效。
+- 当前进度：**第 2.5 天基础重构** —— 已完成控制器、游戏会话、玩家模型、场景生命周期、
+  登录档案拆分，以及「破碎回廊」双界主题；玩家现已可移动并消耗能量切换世界。
 - 详细设计：`《双界行者》项目需求说明书.md`
 
 ---
@@ -18,7 +18,7 @@
 | Java | 21（以 `--release 21` 编译） | 满足需求「JDK 17+」要求 |
 | JavaFX | 21.0.6 | 满足需求「JavaFX 17+」要求 |
 | Maven | 3.9（内置 `mvnw` / `mvnw.cmd` wrapper） | 无需单独安装 Maven |
-| JUnit | 5.12.1 | 已配置，测试将在地图生成（第 5 天起）阶段编写 |
+| JUnit | 5.12.1 | 已配置，当前包含玩家、档案、输入与世界切换规则测试 |
 
 ---
 
@@ -53,9 +53,9 @@ mvnw.cmd javafx:run
 | 菜单确认 | 鼠标左键 / Enter / 方向键聚焦 | ✅ 已实现 |
 | 暂停 / 继续 | Esc / P | ✅ 已实现 |
 | 切换全屏 | F11 / Alt+Enter | ✅ 已实现 |
-| 移动 | WASD / 方向键 | 🔜 第 3 天 |
+| 移动 | WASD / 方向键 | ✅ 已实现 |
 | 瞄准 / 射击 | 鼠标 / 左键连发 | 🔜 第 3 天 |
-| 切换世界（光/影） | Shift | 🔜 第 4 天 |
+| 切换世界（光/影） | Shift | ✅ 基础规则与视觉反馈已实现 |
 
 ---
 
@@ -65,7 +65,7 @@ mvnw.cmd javafx:run
 
 - **工程对齐**：包名迁移为 `com.phantomcorridor`；Maven 模块 `module-info` 更新（仅 `requires javafx.controls`，移除不必要的 FXML 依赖）；JavaFX 21 / JUnit 5；`mvnw` wrapper
 - **分层结构**（对应新需求 §9.1）：
-  - `config` —— `AppConfig`（窗口/标题/帧率）、`GameConfig`（玩家属性/相位能量回复）、`RoomConfig`（房间尺寸/房间类型权重）、`Settings`（灵敏度/音量/种子/昵称）
+  - `config` —— `AppConfig`（窗口/标题/帧率）、`GameConfig`（玩家属性/相位能量回复）、`RoomConfig`（房间尺寸/房间类型权重）、`Settings`（灵敏度/音量/种子）
   - `controller` —— `SceneManager`（统一场景切换 §9.3）
   - `core` —— `GameLoop`（AnimationTimer 固定 60Hz 步长主循环）、`GameState`（LOGIN/MAIN_MENU/PLAYING/PAUSED/GAME_OVER）
   - `model` —— 数据契约枚举 `WorldType`（光/影）、`RoomType`（入口/战斗/奖励/商店/事件/Boss）、`ItemType`（光/影/双/通用）；`entity/room/dungeon/combat/ai/effect` 子包已立（§9.1 规划）
@@ -73,6 +73,15 @@ mvnw.cmd javafx:run
   - `view` —— `LoginView`（§8.1 登录：昵称 + 本地密码）、`MainMenuView`（§8.2 主菜单）、`GameView`（Canvas + 游戏主循环）、`PauseView`（暂停）、`SettingsOverlay`（设置）
 - **双界主题（光/影）**：左上**光之界**暖金辉光球 + 右下**影之界**冷紫辉光球，标题金→紫渐变字色，按钮影紫面板 + 悬停影紫渐变填充、金光文字；余烬粒子交替光金/影紫
 - **按钮动效（参考原项目保留）**：悬停放大 + 前置符文光标 ✦ 淡入；菜单入场错峰淡入上浮；覆盖层滑入滑出；开始游戏双界辉光球放大逼近 + 双界遮罩渐入
+
+### ✅ 第 2.5 天：基础修复与视觉重制
+
+- 登录、菜单与游戏分别接入 Controller，View 不再执行昵称校验或游戏规则。
+- `SceneManager` 原子切换状态、界面与生命周期，后台动画和游戏循环可正确停止。
+- 玩家档案从 `Settings` 拆出；登录页补齐可留空的本地密码，设置重置不再清空身份。
+- 新增 `GameSession`、`Player`、`InputState` 与 `WorldShiftSystem`，支持移动、影形态加速、满能量切界、冷却和相位脉冲事件。
+- 菜单背景改为旧金圣辉/幽紫影域/中央裂隙构成的“破碎回廊”，游戏画面加入相位墙、世界化配色和基础 HUD。
+- 新增 7 项自动化测试，并升级 Surefire 以正确运行 JUnit 5。
 
 ### 📅 后续开发计划（《双界行者》需求 §11）
 
@@ -112,12 +121,12 @@ src/main/java
     │   ├── WorldType.java        // 光之界 / 影之界
     │   ├── RoomType.java         // 入口/战斗/奖励/商店/事件/Boss
     │   ├── ItemType.java         // 光/影/双/通用
-    │   ├── entity/               // Player/Enemy/Bullet/ItemPickup（规划）
+    │   ├── entity/               // Player 已实现；Enemy/Bullet/ItemPickup 待接入
     │   ├── room/                 // Room/Door（规划）
     │   ├── dungeon/              // MapGenerator/NodeGraph（规划）
     │   ├── combat/               // BulletManager/DamageCalculator（规划）
     │   ├── ai/                   // IdleAI/ChaseAI/AttackAI（规划）
-    │   └── effect/               // ItemEffect/WorldShiftEffect（规划）
+    │   └── effect/               // WorldShiftSystem（满能量切界、冷却、相位脉冲）
     ├── util/
     │   ├── CollisionUtil.java    // 圆-圆/圆-矩形/点-矩形碰撞
     │   ├── RandomUtil.java       // 区间/权重随机、固定种子复现
@@ -125,11 +134,13 @@ src/main/java
     └── view/
         ├── LoginView.java        // 登录界面（昵称 + 本地密码）
         ├── MainMenuView.java     // 主菜单（双界主题）
-        ├── GameView.java         // Canvas 游戏画面（占位渲染）
+        ├── GameView.java         // 输入转发、Canvas 容器与切界闪屏
+        ├── GameRenderer.java     // 房间、玩家与 HUD 纯渲染
+        ├── DualWorldBackdrop.java // 登录/菜单双界回廊动态背景
         ├── PauseView.java        // 暂停面板
         └── SettingsOverlay.java  // 设置覆盖层
 src/main/resources
-└── com/phantomcorridor/ui/ui.css // 全局样式（黑白交融 · 双界主题）
+└── com/phantomcorridor/ui/ui.css // 全局样式（破碎回廊 · 双界主题）
 ```
 
 *每个包均带 `package-info.java` 说明包职责与规划，方便团队协作。*
@@ -141,7 +152,7 @@ src/main/resources
 - **模型与渲染分离**：`model` 包为纯 POJO，不依赖 JavaFX 节点；渲染统一走 Canvas（§9.2）
 - **固定时间步长**：核心 `GameLoop` 逻辑更新恒定 1/60s，与刷新率解耦（$3.3 手感保障）
 - **碰撞集中化**：`util.CollisionUtil` 承载全部几何判定
-- **场景统一切换**：`controller.SceneManager.switchTo(view)` 集中处理界面流转（§9.3）
+- **场景统一切换**：`SceneManager.switchTo(state, view)` 原子更新状态、界面与生命周期（§9.3）
 - **双世界契约**：`model.WorldType` 贯穿玩家/敌人/子弹，跨世界伤害与可见性由 `combat.DamageCalculator` 收敛
 
 ## 协作约定

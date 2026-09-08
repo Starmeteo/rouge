@@ -1,122 +1,100 @@
 package com.phantomcorridor.view;
 
-import com.phantomcorridor.config.AppConfig;
-import com.phantomcorridor.config.Settings;
+import com.phantomcorridor.controller.SceneLifecycle;
 import javafx.geometry.Pos;
 import javafx.scene.control.Button;
 import javafx.scene.control.Label;
+import javafx.scene.control.PasswordField;
 import javafx.scene.control.TextField;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.StackPane;
 import javafx.scene.layout.VBox;
 
-/**
- * 登录界面（对应《双界行者》需求 §8.1 登录界面、§4.3 存档设计）。
- *
- * <p>应用启动的第一个场景（§8.1）。玩家输入<b>昵称</b>（必填）用于本地玩家档案识别
- * （仅本地，无服务器联网，§4.3）。登录页<b>不设密码</b>，仅需昵称即可进入主菜单。
- *
- * <p>背景复用 {@link NightSkyBackdrop}（夜空 · 双辉主题），与主菜单视觉连续，
- * 登录时即可感知游戏「光与影」的双界基调（§3.1 世界配色）。
- *
- * <p><b>视图职责界限</b>：本类只做布局与输入收集（view），不实现校验逻辑；
- * 当昵称非空时回调 {@code onLoggedIn}，并把昵称写入注入的 {@link Settings}。
- */
-public class LoginView extends StackPane {
+import java.util.function.BiConsumer;
 
-    /** 登录界面标题 */
-    private static final String TITLE = "双界行者";
+/** 登录视图：只收集输入并展示校验结果，校验规则由 LoginController 负责。 */
+public final class LoginView extends StackPane implements SceneLifecycle {
 
-    /** 登录界面副标题 */
-    private static final String SUBTITLE = "光与影 · 皆通途";
-
-    /** 昵称输入框 */
+    private final DualWorldBackdrop backdrop = new DualWorldBackdrop();
     private final TextField nicknameField = new TextField();
+    private final PasswordField passwordField = new PasswordField();
+    private final Label errorLabel = new Label();
 
-    /** 夜空双辉背景（与主菜单共用渲染组件，保证界面风格连续） */
-    private final NightSkyBackdrop backdrop;
-
-    private final Settings settings;
-
-    /**
-     * 构建登录面板。
-     *
-     * @param settings   全局设置对象（登录成功后写入玩家昵称）
-     * @param onLoggedIn 登录成功回调（昵称非空时由本类触发，由 App 切换到主菜单）
-     */
-    public LoginView(Settings settings, Runnable onLoggedIn) {
-        this.settings = settings;
+    public LoginView(BiConsumer<String, String> onSubmit) {
         getStyleClass().add("login-pane");
-
-        // 背景置于最底层；表单内容叠加其上
-        backdrop = new NightSkyBackdrop(AppConfig.VIEW_WIDTH, AppConfig.VIEW_HEIGHT);
         backdrop.setManaged(false);
-        getChildren().add(backdrop);
 
-        // 双界图标：☀（光之界，金色）与 ☾（影之界，紫色）分列标题两侧（§3.1 世界配色）
-        Label sun = new Label("☀");
-        sun.getStyleClass().add("login-icon-light");
-        Label moon = new Label("☾");
-        moon.getStyleClass().add("login-icon-shadow");
+        Label lightMark = domainMark("光", "domain-mark-light");
+        Label shadowMark = domainMark("影", "domain-mark-shadow");
 
-        Label title = new Label(TITLE);
+        Label eyebrow = new Label("PHANTOM CORRIDOR");
+        eyebrow.getStyleClass().add("eyebrow");
+        Label title = new Label("双界行者");
         title.getStyleClass().add("login-title");
-
-        HBox titleRow = new HBox(20.0, sun, title, moon);
-        titleRow.setAlignment(Pos.CENTER);
-
-        Label subtitle = new Label(SUBTITLE);
+        Label subtitle = new Label("以光为刃 · 借影而行");
         subtitle.getStyleClass().add("login-subtitle");
 
+        VBox titleGroup = new VBox(8.0, eyebrow, title, subtitle);
+        titleGroup.setAlignment(Pos.CENTER);
+        HBox titleRow = new HBox(22.0, lightMark, titleGroup, shadowMark);
+        titleRow.setAlignment(Pos.CENTER);
+
         nicknameField.getStyleClass().add("login-input");
-        nicknameField.setPromptText("昵称（必填）");
-        nicknameField.setPrefWidth(300.0);
-        nicknameField.setMaxWidth(300.0);
+        nicknameField.setPromptText("旅者昵称（必填）");
+        passwordField.getStyleClass().add("login-input");
+        passwordField.setPromptText("本地密码（可留空）");
 
-        Label hint = new Label("本地档案识别 · 无联网（需求 §4.3）");
-        hint.getStyleClass().add("hint-text");
+        errorLabel.getStyleClass().add("form-error");
+        errorLabel.setMinHeight(22.0);
 
-        Button startButton = createLoginButton("进入", onLoggedIn);
-        startButton.setDefaultButton(true); // Enter 快捷登录
+        Button enterButton = new Button("踏入回廊");
+        enterButton.getStyleClass().addAll("menu-button", "primary-button");
+        enterButton.setDefaultButton(true);
+        enterButton.setOnAction(event -> onSubmit.accept(nicknameField.getText(), passwordField.getText()));
 
-        // 恢复上次输入的昵称（若有），提升重复游玩体验
-        nicknameField.setText(settings.getPlayerNickname());
+        Label privacy = new Label("仅用于本地档案识别 · 不连接服务器");
+        privacy.getStyleClass().add("hint-text");
 
-        // 登录卡：半透深底 + 金边辉光，双界主题的游戏化表单（与主菜单按钮同风格）
-        VBox box = new VBox(22.0, titleRow, subtitle, nicknameField, hint, startButton);
-        box.getStyleClass().add("login-card");
-        box.setAlignment(Pos.CENTER);
-        box.setFillWidth(false);
-        box.setMaxWidth(VBox.USE_PREF_SIZE);
-        getChildren().add(box);
+        VBox fields = new VBox(14.0, nicknameField, passwordField, errorLabel, enterButton, privacy);
+        fields.setAlignment(Pos.CENTER);
+        fields.setMaxWidth(360.0);
 
-        // 面板不可见时停止背景动效（避免 CPU 空转）；可见时启动
-        visibleProperty().addListener((obs, oldValue, newValue) -> {
-            if (newValue) {
-                backdrop.start();
-            } else {
-                backdrop.stop();
-            }
-        });
-        backdrop.start();
+        VBox card = new VBox(34.0, titleRow, fields);
+        card.getStyleClass().add("login-card");
+        card.setAlignment(Pos.CENTER);
+        card.setMaxWidth(620.0);
+
+        getChildren().addAll(backdrop, card);
     }
 
-    /** 创建登录按钮并绑定动作（样式复用 ui.css 的 .menu-button，悬停/聚焦动效与主菜单一致） */
-    private Button createLoginButton(String text, Runnable onLoggedIn) {
-        Button button = new Button(text);
-        button.getStyleClass().add("menu-button");
-        button.setOnAction(event -> submit(onLoggedIn));
-        return button;
+    private static Label domainMark(String text, String styleClass) {
+        Label label = new Label(text);
+        label.getStyleClass().addAll("domain-mark", styleClass);
+        return label;
     }
 
-    /** 提交登录：昵称非空才写入档案并回调；否则聚焦昵称框提示 */
-    private void submit(Runnable onLoggedIn) {
-        String nickname = nicknameField.getText();
-        if (nickname == null || nickname.trim().isEmpty()) {
-            nicknameField.requestFocus();
-            return;
-        }
-        settings.setPlayerNickname(nickname);
-        onLoggedIn.run();
+    public void setNickname(String nickname) {
+        nicknameField.setText(nickname == null ? "" : nickname);
+    }
+
+    public void showError(String message) {
+        errorLabel.setText(message);
+        nicknameField.requestFocus();
+    }
+
+    public void clearError() {
+        errorLabel.setText("");
+    }
+
+    @Override
+    public void onEnter() {
+        backdrop.onEnter();
+        nicknameField.requestFocus();
+    }
+
+    @Override
+    public void onExit() {
+        backdrop.onExit();
+        passwordField.clear();
     }
 }

@@ -8,8 +8,8 @@ package com.phantomcorridor.config;
  *   <li><b>鼠标灵敏度</b> —— 第 3 天战斗系统接入瞄准计算（需求 §3.3 攻击手感）；</li>
  *   <li><b>音效 / 音乐音量</b> —— 第 8 天音频系统接入；</li>
  *   <li><b>开发随机种子</b> —— 第 5 天地图生成接入（需求 §3.3 复现地图，便于调试）；</li>
- *   <li><b>玩家昵称</b> —— 登录界面写入，用于本地玩家档案识别（需求 §4.3 存档设计）；</li>
- *   <li>持久化（保存到用户目录配置文件）计划在第 8 天后的界面完善阶段加入。</li>
+ *   <li>玩家档案已拆分至 {@code PlayerProfile}，恢复默认设置不会清空身份；</li>
+ *   <li>持久化（保存到用户目录配置文件）计划在后续界面完善阶段加入。</li>
  * </ul>
  */
 public class Settings {
@@ -41,8 +41,6 @@ public class Settings {
     /** 开发模式随机种子（空字符串表示每次随机；第 5 天地图生成接入） */
     private String devSeed = "";
 
-    /** 玩家昵称（登录界面录入，用于本地档案识别，可留空但不建议） */
-    private String playerNickname = "";
 
     /** @return 鼠标灵敏度倍率（0.5~2.0） */
     public double getMouseSensitivity() {
@@ -84,23 +82,12 @@ public class Settings {
         this.devSeed = devSeed == null ? "" : devSeed.trim();
     }
 
-    /** @return 玩家昵称（本地档案标识） */
-    public String getPlayerNickname() {
-        return playerNickname;
-    }
-
-    /** @param playerNickname 玩家昵称（为空表示未填写） */
-    public void setPlayerNickname(String playerNickname) {
-        this.playerNickname = playerNickname == null ? "" : playerNickname.trim();
-    }
-
     /** 恢复全部设置到默认值（供"恢复默认"按钮调用） */
     public void reset() {
         mouseSensitivity = DEFAULT_MOUSE_SENSITIVITY;
         sfxVolume = DEFAULT_SFX_VOLUME;
         musicVolume = DEFAULT_MUSIC_VOLUME;
         devSeed = "";
-        playerNickname = "";
     }
 
     /** 将数值钳制到 [min, max] 闭区间 */

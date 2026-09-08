@@ -1,260 +1,232 @@
-/* 《双界行者》全局样式表 —— 「夜空 · 双辉」主题
- * 设计理念（需求 §3.1、§8.4）：核心是「光 / 影」两界并存与相互映照。
- * 参考静谧的深蓝夜色：天际泛着深蓝渐变、星光点点，一束白金光弧划空（光之界），
- * 并在下方深紫蓝水面形成粼粼倒影（影之界）—— 光与影在这片夜里交相辉映。
- * 主菜单/登录的夜空背景由 NightSkyBackdrop 的 Canvas 实时绘制；本表负责前景配色与双辉点缀。 */
+/* 双界行者：破碎回廊主题。视觉重点是旧金圣辉、幽紫影域和中央裂隙。 */
 
 .root {
-    -fx-font-family: "Microsoft YaHei", "PingFang SC", "Noto Sans CJK SC", "sans-serif";
-    -fx-background-color: #040a1a;
+    -fx-font-family: "Microsoft YaHei UI", "PingFang SC", "Noto Sans CJK SC", sans-serif;
+    -fx-background-color: #07060b;
 }
 
-/* ==================== 登录界面（深蓝天际 → 水面） ==================== */
+.login-pane,
+.main-menu-pane {
+    -fx-background-color: #07060b;
+}
 
-.login-pane {
-    /* 兜底底色（实际被 NightSkyBackdrop 画布覆盖） */
-    -fx-background-color: linear-gradient(to bottom,
-            #0a1a3e 0%,
-            #16335f 42%,
-            #1f427a 56%,
-            #0e2248 70%,
-            #030a1c 100%);
+.eyebrow {
+    -fx-font-family: "Georgia";
+    -fx-font-size: 13px;
+    -fx-font-weight: bold;
+    -fx-text-fill: rgba(226, 202, 157, 0.72);
 }
 
 .login-title {
-    -fx-font-size: 56px;
+    -fx-font-family: "STKaiti", "KaiTi", "Microsoft YaHei UI";
+    -fx-font-size: 66px;
     -fx-font-weight: bold;
-    -fx-text-fill: #ffffff;
-    -fx-effect: dropshadow(gaussian, rgba(0, 0, 0, 0.9), 7, 0.55, 0, 2),
-        dropshadow(gaussian, rgba(255, 224, 160, 0.42), 26, 0.4, 0, 2);
+    -fx-text-fill: linear-gradient(to right, #f4dfae 0%, #d7b364 43%, #ccb9e8 58%, #9868d3 100%);
+    -fx-effect: dropshadow(gaussian, rgba(0, 0, 0, 0.95), 12, 0.58, 0, 4);
 }
 
-/* 双界图标：☀ 光之界（金辉）、☾ 影之界（紫辉），分列标题两侧（§3.1） */
-.login-icon-light {
-    -fx-font-size: 40px;
-    -fx-text-fill: #ffd76e;
-    -fx-effect: dropshadow(gaussian, rgba(255, 215, 110, 0.65), 22, 0.5, 0, 0);
-}
-
-.login-icon-shadow {
-    -fx-font-size: 40px;
-    -fx-text-fill: #a878e8;
-    -fx-effect: dropshadow(gaussian, rgba(168, 120, 232, 0.65), 22, 0.5, 0, 0);
-}
-
-/* 登录卡：玻璃半透明（深色底降至 0.32，背景透出；保留金色细边与辉光维持结构感） */
-.login-card {
-    -fx-background-color: rgba(10, 6, 28, 0.32);
-    -fx-background-radius: 18;
-    -fx-border-color: #b48a3a;
-    -fx-border-width: 1px;
-    -fx-border-radius: 18;
-    -fx-padding: 44 56 44 56;
-    -fx-effect: dropshadow(gaussian, rgba(0, 0, 0, 0.6), 40, 0.45, 0, 8),
-        dropshadow(gaussian, rgba(255, 220, 150, 0.22), 26, 0.4, 0, 0);
-}
-
-/* 副标题加暗色投影，保证在暖金背景上仍清晰可读 */
-.login-subtitle {
-    -fx-effect: dropshadow(gaussian, rgba(60, 30, 0, 0.55), 8, 0.3, 0, 1);
-}
-
-.login-subtitle {
-    -fx-font-size: 20px;
-    -fx-text-fill: #a9c2e8;
-}
-
-.login-input {
-    -fx-font-size: 17px;
-    -fx-background-color: rgba(8, 10, 26, 0.86);
-    -fx-background-radius: 8;
-    -fx-border-color: #b48a3a;
-    -fx-border-width: 1px;
-    -fx-border-radius: 8;
-    -fx-text-fill: #eef5ff;
-    -fx-prompt-text-fill: #9ab4dd;
-    -fx-padding: 10 14 10 14;
-}
-
-.login-input:focused {
-    -fx-border-color: #cfe3ff;
-}
-
-/* ==================== 主菜单（夜景画布之上叠加前景） ==================== */
-
-.main-menu-pane {
-    /* 夜空画布盖满整窗，此处仅作兜底底色 */
-    -fx-background-color: linear-gradient(to bottom, #0a1a3e 0%, #16335f 42%, #030a1c 100%);
-}
-
-/* 主标题：白色 + 深蓝投影（在夜景上清晰），辅以白金辉光（光之界）与淡紫层次（影之界） */
-.menu-title {
-    -fx-font-size: 84px;
-    -fx-font-weight: bold;
-    -fx-text-fill: #ffffff;
-    -fx-effect: dropshadow(gaussian, rgba(0, 0, 0, 0.9), 7, 0.55, 0, 2),
-        dropshadow(gaussian, rgba(255, 224, 160, 0.45), 30, 0.4, 0, 2);
-}
-
-/* 副标题：深褐文字在暖金天空上清晰可读，辅以淡奶油色细晕 */
+.login-subtitle,
 .menu-subtitle {
-    -fx-font-size: 19px;
-    -fx-text-fill: #5a3a10;
-    -fx-effect: dropshadow(gaussian, rgba(255, 250, 235, 0.6), 5, 0.3, 0, 0);
+    -fx-font-family: "STKaiti", "KaiTi", "Microsoft YaHei UI";
+    -fx-font-size: 18px;
+    -fx-text-fill: #c5b79e;
 }
 
-/* 标题与按钮之间的紫→白金渐变分隔线（两侧为影紫、中央为光金） */
-.menu-divider {
-    -fx-min-height: 2px;
-    -fx-max-height: 2px;
-    -fx-min-width: 360px;
-    -fx-max-width: 360px;
-    -fx-background-color: linear-gradient(to right,
-            rgba(200, 170, 240, 0.0), rgba(200, 170, 240, 0.85) 28%,
-            #ffe9b0 50%, rgba(200, 170, 240, 0.85) 72%, rgba(200, 170, 240, 0.0));
-}
-
-/* 菜单按钮：深蓝玻璃面板 + 亮边；悬停提亮 + 白色辉光 */
-.menu-button {
-    -fx-font-size: 22px;
-    -fx-min-width: 320px;
+.domain-mark {
+    -fx-font-family: "STKaiti", "KaiTi", "Microsoft YaHei UI";
+    -fx-font-size: 24px;
+    -fx-font-weight: bold;
+    -fx-alignment: center;
+    -fx-min-width: 58px;
     -fx-min-height: 58px;
-    -fx-background-color: rgba(8, 16, 38, 0.82);
-    -fx-background-radius: 10;
-    -fx-border-color: #7ea8e0;
+    -fx-background-radius: 50%;
+    -fx-border-radius: 50%;
     -fx-border-width: 1px;
-    -fx-border-radius: 10;
-    -fx-text-fill: #eaf2ff;
-    -fx-cursor: hand;
-    -fx-padding: 8 24 8 24;
-    -fx-effect: dropshadow(gaussian, rgba(0, 0, 0, 0.45), 16, 0.4, 0, 4);
 }
 
-.menu-button:hover {
-    -fx-background-color: linear-gradient(to bottom, #2c5488, #1a3a66);
-    -fx-border-color: #ffe9b0;
-    -fx-text-fill: #fff6e0;
-    -fx-effect: dropshadow(gaussian, rgba(255, 226, 165, 0.6), 28, 0.5, 0, 0);
+.domain-mark-light {
+    -fx-text-fill: #f0ca79;
+    -fx-border-color: rgba(232, 189, 104, 0.72);
+    -fx-background-color: rgba(74, 53, 24, 0.52);
+    -fx-effect: dropshadow(gaussian, rgba(232, 189, 104, 0.30), 22, 0.30, 0, 0);
+}
+
+.domain-mark-shadow {
+    -fx-text-fill: #b58ae9;
+    -fx-border-color: rgba(155, 101, 220, 0.72);
+    -fx-background-color: rgba(42, 22, 69, 0.58);
+    -fx-effect: dropshadow(gaussian, rgba(155, 101, 220, 0.32), 22, 0.30, 0, 0);
+}
+
+.login-card,
+.menu-panel {
+    -fx-background-color: linear-gradient(to bottom right,
+        rgba(25, 21, 20, 0.90), rgba(10, 8, 15, 0.92));
+    -fx-background-radius: 5px;
+    -fx-border-color: linear-gradient(to right,
+        rgba(218, 176, 91, 0.72), rgba(122, 94, 70, 0.35), rgba(132, 80, 190, 0.68));
+    -fx-border-width: 1px;
+    -fx-border-radius: 5px;
+    -fx-padding: 48px 62px 48px 62px;
+    -fx-effect: dropshadow(gaussian, rgba(0, 0, 0, 0.78), 38, 0.45, 0, 12);
+}
+
+.menu-panel {
+    -fx-padding: 36px 64px 42px 64px;
+}
+
+.login-input,
+.settings-seed-field {
+    -fx-font-size: 16px;
+    -fx-pref-width: 350px;
+    -fx-pref-height: 48px;
+    -fx-background-color: rgba(5, 5, 9, 0.76);
+    -fx-background-radius: 3px;
+    -fx-border-color: rgba(181, 153, 103, 0.46);
+    -fx-border-width: 1px;
+    -fx-border-radius: 3px;
+    -fx-text-fill: #eee6d8;
+    -fx-prompt-text-fill: #756d66;
+    -fx-padding: 10px 14px;
+}
+
+.login-input:focused,
+.settings-seed-field:focused {
+    -fx-border-color: linear-gradient(to right, #ddb867, #9160ca);
+    -fx-effect: dropshadow(gaussian, rgba(207, 167, 91, 0.18), 12, 0.25, 0, 0);
+}
+
+.form-error {
+    -fx-font-size: 13px;
+    -fx-text-fill: #e17a72;
+}
+
+.menu-title {
+    -fx-font-family: "STKaiti", "KaiTi", "Microsoft YaHei UI";
+    -fx-font-size: 78px;
+    -fx-font-weight: bold;
+    -fx-text-fill: linear-gradient(to right, #f2d89b 0%, #d8b464 45%, #c1a8e1 58%, #9461cf 100%);
+    -fx-effect: dropshadow(gaussian, rgba(0, 0, 0, 0.94), 14, 0.58, 0, 4);
+}
+
+.menu-divider {
+    -fx-min-height: 1px;
+    -fx-max-height: 1px;
+    -fx-min-width: 330px;
+    -fx-max-width: 330px;
+    -fx-background-color: linear-gradient(to right,
+        rgba(232, 189, 104, 0), #e8bd68 35%, #e5d8cc 50%, #9b65dc 65%, rgba(155, 101, 220, 0));
+}
+
+.menu-button {
+    -fx-font-size: 18px;
+    -fx-min-width: 330px;
+    -fx-min-height: 52px;
+    -fx-background-color: rgba(8, 7, 12, 0.76);
+    -fx-background-radius: 3px;
+    -fx-border-color: rgba(169, 141, 99, 0.48);
+    -fx-border-width: 1px;
+    -fx-border-radius: 3px;
+    -fx-text-fill: #ddd3c4;
+    -fx-cursor: hand;
+    -fx-padding: 7px 22px;
+}
+
+.menu-button:hover,
+.menu-button:focused {
+    -fx-background-color: linear-gradient(to right, rgba(74, 51, 24, 0.92), rgba(38, 20, 58, 0.94));
+    -fx-border-color: linear-gradient(to right, #e8bd68, #9b65dc);
+    -fx-text-fill: #fff4df;
+    -fx-effect: dropshadow(gaussian, rgba(171, 122, 211, 0.22), 18, 0.26, 0, 0);
 }
 
 .menu-button:pressed {
-    -fx-background-color: #1a1440;
-    -fx-text-fill: #d9c6ff;
-    -fx-effect: dropshadow(gaussian, rgba(185, 145, 245, 0.4), 14, 0.4, 0, 0);
+    -fx-background-color: #130e1b;
+    -fx-translate-y: 1px;
 }
 
-.menu-button:focused {
-    -fx-border-color: #ffe9b0;
+.primary-button {
+    -fx-border-color: linear-gradient(to right, #d9ad56, #9461cf);
 }
 
-/* 按钮前置符文光标（悬停时淡入，由代码控制透明度；固定宽度不参与文本居中） */
 .menu-cursor {
-    -fx-font-size: 18px;
-    -fx-text-fill: #ffe9b0;
+    -fx-font-size: 15px;
+    -fx-text-fill: #e8bd68;
     -fx-alignment: center;
 }
 
-/* 按钮文本（置于光标与占位之间，严格居中）；悬停/按下时颜色与按钮文字一致 */
 .menu-button-label {
-    -fx-font-size: 22px;
-    -fx-text-fill: #eaf2ff;
+    -fx-font-size: 18px;
+    -fx-text-fill: #ddd3c4;
 }
 
-.menu-button:hover .menu-button-label {
-    -fx-text-fill: #fff6e0;
+.menu-button:hover .menu-button-label,
+.menu-button:focused .menu-button-label {
+    -fx-text-fill: #fff4df;
 }
 
-.menu-button:pressed .menu-button-label {
-    -fx-text-fill: #d9c6ff;
-}
-
-/* 底部版本信息 */
-.menu-footer {
-    -fx-font-size: 13px;
-    -fx-text-fill: #7f97c0;
-}
-
-/* 双界过渡遮罩（开始游戏 / 退出时渐入，由代码控制透明度） */
-.menu-overlay {
-    -fx-background-color: linear-gradient(to bottom,
-            rgba(6, 12, 30, 0.94), rgba(2, 6, 18, 0.97));
-}
-
-/* ==================== 覆盖层（道具图鉴 / 设置，均无背景浮于夜色之上） ==================== */
-
-.overlay-title {
-    -fx-font-size: 30px;
-    -fx-font-weight: bold;
-    -fx-text-fill: linear-gradient(to bottom, #ffffff 0%, #e6d9ff 55%, #a98be0 100%);
-}
-
-/* 键位/分类胶囊：亮底 + 深蓝字，清晰醒目 */
-.keyboard-key {
-    -fx-font-size: 15px;
-    -fx-text-fill: #0b1c3a;
-    -fx-background-color: rgba(234, 242, 255, 0.94);
-    -fx-background-radius: 6;
-    -fx-border-color: #bcd4f5;
-    -fx-border-width: 1px;
-    -fx-border-radius: 6;
-    -fx-padding: 4 12 4 12;
-}
-
-/* 道具图鉴：说明文字 */
-.help-desc {
-    -fx-font-size: 16px;
-    -fx-text-fill: #d5e3ff;
-}
-
-/* 通用小字提示（说明/设置底部） */
+.menu-footer,
 .hint-text {
-    -fx-font-size: 13px;
-    -fx-text-fill: #8ea6cf;
+    -fx-font-size: 12px;
+    -fx-text-fill: rgba(184, 172, 164, 0.55);
 }
 
-/* ==================== 设置面板 ==================== */
+.menu-overlay {
+    -fx-background-color: radial-gradient(center 50% 50%, radius 70%, rgba(43, 24, 64, 0.96), #050409);
+}
 
+.overlay-title,
+.pause-title {
+    -fx-font-family: "STKaiti", "KaiTi", "Microsoft YaHei UI";
+    -fx-font-size: 42px;
+    -fx-font-weight: bold;
+    -fx-text-fill: linear-gradient(to right, #ecd08f, #aa7adc);
+}
+
+.keyboard-key {
+    -fx-font-size: 14px;
+    -fx-text-fill: #edcf8e;
+    -fx-background-color: rgba(42, 31, 19, 0.88);
+    -fx-background-radius: 3px;
+    -fx-border-color: rgba(221, 177, 91, 0.56);
+    -fx-border-radius: 3px;
+    -fx-padding: 6px 14px;
+}
+
+.help-desc,
 .settings-label {
-    -fx-font-size: 16px;
-    -fx-text-fill: #eaf2ff;
+    -fx-font-size: 15px;
+    -fx-text-fill: #d7cddd;
 }
 
 .settings-value {
-    -fx-font-size: 15px;
-    -fx-text-fill: #cfe0ff;
-    -fx-min-width: 56px;
+    -fx-font-size: 14px;
+    -fx-text-fill: #c2a4dd;
+    -fx-min-width: 62px;
 }
 
-/* 滑块：蓝轨 + 白拇指 */
 .settings-slider .track {
-    -fx-background-color: #1f3f70;
-    -fx-background-radius: 4;
+    -fx-background-color: linear-gradient(to right, #725526, #563475);
+    -fx-background-radius: 2px;
 }
 
 .settings-slider .thumb {
-    -fx-background-color: #ffffff;
+    -fx-background-color: #e8d5ae;
+    -fx-background-radius: 2px;
 }
-
-/* 随机种子输入框 */
-.settings-seed-field {
-    -fx-font-size: 15px;
-    -fx-background-color: rgba(8, 16, 40, 0.92);
-    -fx-background-radius: 6;
-    -fx-border-color: #6d93c8;
-    -fx-border-width: 1px;
-    -fx-border-radius: 6;
-    -fx-text-fill: #eef5ff;
-    -fx-prompt-text-fill: #9ab4dd;
-}
-
-/* ==================== 暂停 ==================== */
 
 .pause-pane {
-    -fx-background-color: rgba(6, 4, 20, 0.92);
+    -fx-background-color: radial-gradient(center 50% 45%, radius 68%, #1b1226, #050409);
 }
 
-.pause-title {
-    -fx-font-size: 46px;
-    -fx-font-weight: bold;
-    -fx-text-fill: linear-gradient(to bottom, #ffffff 0%, #e6d9ff 60%, #a98be0 100%);
+.world-shift-flash {
+    -fx-background-color: rgba(255, 255, 255, 0.70);
+}
+
+.shift-to-light {
+    -fx-background-color: radial-gradient(center 50% 50%, radius 70%, #fff4d0, rgba(232, 189, 104, 0.44));
+}
+
+.shift-to-shadow {
+    -fx-background-color: radial-gradient(center 50% 50%, radius 70%, #090511, rgba(116, 61, 174, 0.68));
 }

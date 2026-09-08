@@ -22,7 +22,7 @@ import javafx.animation.AnimationTimer;
 public abstract class GameLoop extends AnimationTimer {
 
     /** 逻辑更新固定时间步长（秒），与 {@link com.phantomcorridor.config.AppConfig#FIXED_DT} 一致 */
-    protected static final double FIXED_DT = 1.0 / 60.0;
+    protected static final double FIXED_DT = com.phantomcorridor.config.AppConfig.FIXED_DT;
 
     /** 单帧耗时上限（秒）：超过则截断，避免卡顿后追帧导致性能崩溃 */
     private static final double MAX_FRAME_TIME = 0.25;

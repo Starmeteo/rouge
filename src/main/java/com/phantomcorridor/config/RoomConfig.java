@@ -14,6 +14,9 @@ package com.phantomcorridor.config;
  */
 public final class RoomConfig {
 
+    /** 玩家中心距离房间边缘的最小距离（像素）。 */
+    public static final double ROOM_INNER_PADDING = 54.0;
+
     // ---- 房间可视区域大小（双界共用同一房间布局；全画布尺寸，内部走廊/障碍物由模板决定） ----
     /** 房间宽度（像素），与逻辑视口一致 */
     public static final double ROOM_WIDTH = AppConfig.VIEW_WIDTH;

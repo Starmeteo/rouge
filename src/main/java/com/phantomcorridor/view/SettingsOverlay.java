@@ -10,6 +10,7 @@ import javafx.scene.layout.HBox;
 import javafx.scene.layout.VBox;
 
 import java.util.function.DoubleConsumer;
+import java.util.function.Supplier;
 
 /**
  * 设置覆盖层（主菜单"设置"入口弹出的覆盖层，无边框设计，风格与道具图鉴一致）。
@@ -19,7 +20,7 @@ import java.util.function.DoubleConsumer;
  *   <li>鼠标灵敏度（0.5×~2.0×）—— 第 3 天战斗接入；</li>
  *   <li>音效 / 音乐音量 —— 第 8 天音频接入；</li>
  *   <li>开发模式随机种子 —— 第 5 天地图生成接入（复现地图）；</li>
- *   <li>玩家昵称 —— 登录界面写入（此处只读展示）。</li>
+ *   <li>玩家昵称 —— 来自独立本地档案（此处只读展示）。</li>
  * </ul>
  *
  * <p>面板只读写注入的 {@link Settings} 对象，不直接关心具体功能如何使用这些值。
@@ -33,6 +34,7 @@ public class SettingsOverlay extends VBox {
     private static final double SLIDER_WIDTH = 260.0;
 
     private final Settings settings;
+    private final Supplier<String> nicknameSupplier;
 
     /** 鼠标灵敏度滑块（引用保存，供"恢复默认"时回写） */
     private final Slider sensitivitySlider = new Slider(
@@ -56,8 +58,9 @@ public class SettingsOverlay extends VBox {
      * @param settings 全局设置对象（面板读写该对象）
      * @param onBack   点击"返回菜单"回调（由主菜单执行覆盖层收起动画）
      */
-    public SettingsOverlay(Settings settings, Runnable onBack) {
+    public SettingsOverlay(Settings settings, Supplier<String> nicknameSupplier, Runnable onBack) {
         this.settings = settings;
+        this.nicknameSupplier = nicknameSupplier;
         setAlignment(Pos.CENTER);
         setFillWidth(false); // 各行保持自然宽度并整体居中，避免内容被拉伸后贴向一侧
         setMaxWidth(VBox.USE_PREF_SIZE);
@@ -157,7 +160,7 @@ public class SettingsOverlay extends VBox {
 
     /** 刷新昵称只读展示文本 */
     private void refreshNickname() {
-        String nickname = settings.getPlayerNickname();
+        String nickname = nicknameSupplier.get();
         nicknameLabel.setText(nickname == null || nickname.isEmpty() ? "（未设置）" : nickname);
     }
 

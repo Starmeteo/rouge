@@ -1,5 +1,6 @@
 package com.phantomcorridor.view;
 
+import com.phantomcorridor.controller.SceneLifecycle;
 import javafx.geometry.Pos;
 import javafx.scene.control.Button;
 import javafx.scene.control.Label;
@@ -12,7 +13,7 @@ import javafx.scene.layout.VBox;
  *
  * <p>游戏进行中按 Esc/P 时由 {@code App} 切换到本面板，提供「继续游戏」与「回到主菜单」。
  */
-public class PauseView extends StackPane {
+public class PauseView extends StackPane implements SceneLifecycle {
 
     /**
      * 构建暂停面板。
@@ -50,5 +51,10 @@ public class PauseView extends StackPane {
         button.getStyleClass().add("menu-button");
         button.setOnAction(event -> action.run());
         return button;
+    }
+
+    @Override
+    public void onEnter() {
+        requestFocus();
     }
 }

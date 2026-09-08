@@ -2,6 +2,7 @@ package com.phantomcorridor.view;
 
 import com.phantomcorridor.config.AppConfig;
 import com.phantomcorridor.config.Settings;
+import com.phantomcorridor.controller.SceneLifecycle;
 import javafx.animation.FadeTransition;
 import javafx.animation.ParallelTransition;
 import javafx.animation.ScaleTransition;
@@ -22,20 +23,20 @@ import javafx.util.Duration;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.function.Supplier;
 
 /**
  * 主菜单面板（对应《双界行者》需求 §8.2 主菜单）。
  *
- * <p><b>「夜空 · 双辉」主题</b>：背景复用 {@link NightSkyBackdrop} —— 深蓝夜空、满天星斗、
- * 一道<b>白金色光弧</b>（光之界）划空并在<b>深紫蓝色水面</b>（影之界）投下粼粼倒影，
- * 呼应『光与影两界并存、相互映照』的核心设定（§2 卖点）。
+ * <p><b>「破碎回廊」主题</b>：背景复用 {@link DualWorldBackdrop}，以左侧旧金圣辉、
+ * 右侧幽紫影域和中央动态裂隙表达两界并存。
  *
  * <p><b>按钮动效</b>：悬停轻微放大 + 前置符文光标 ✦ 淡入；菜单入场标题/分隔线/按钮依次
  * 淡入上浮；覆盖层滑入滑出；开始/退出游戏时双界遮罩渐入。
  *
  * <p><b>菜单按钮顺序</b>（§8.2）：开始游戏 / 道具图鉴 / 设置 / 退出。
  */
-public class MainMenuView extends StackPane {
+public class MainMenuView extends StackPane implements SceneLifecycle {
 
     /** 入场动画：相邻元素错峰间隔（毫秒） */
     private static final double ENTER_STEP_MS = 70.0;
@@ -56,7 +57,7 @@ public class MainMenuView extends StackPane {
     private static final String TITLE = "双界行者";
 
     /** 副标题文本 */
-    private static final String SUBTITLE = "光与影 · 皆通途";
+    private static final String SUBTITLE = "以光为刃 · 借影而行";
 
     /** 底部版本信息文本 */
     private static final String FOOTER = "v0.3.1 · 双界行者 · JavaFX Roguelike 可玩原型";
@@ -77,7 +78,10 @@ public class MainMenuView extends StackPane {
     private final Region overlay;
 
     /** 夜空双辉背景（星空 / 白金光弧 / 紫影倒影与涟漪动效） */
-    private final NightSkyBackdrop backdrop;
+    private final DualWorldBackdrop backdrop;
+
+    /** 防止快速重复点击启动多组互相竞争的过渡动画。 */
+    private boolean transitionLocked;
 
     /**
      * 构建主菜单面板。
@@ -86,11 +90,12 @@ public class MainMenuView extends StackPane {
      * @param onQuit   "退出"回调 —— 过渡结束后关闭主窗口
      * @param settings 全局设置对象（设置面板读写）
      */
-    public MainMenuView(Runnable onStart, Runnable onQuit, Settings settings) {
+    public MainMenuView(Runnable onStart, Runnable onQuit, Settings settings,
+                        Supplier<String> nicknameSupplier) {
         getStyleClass().add("main-menu-pane");
 
         // 背景置于最底层（夜空光弧 + 水面动效）；菜单内容等叠加其上
-        backdrop = new NightSkyBackdrop(AppConfig.VIEW_WIDTH, AppConfig.VIEW_HEIGHT);
+        backdrop = new DualWorldBackdrop();
         backdrop.setManaged(false);
         getChildren().add(backdrop);
 
@@ -105,7 +110,8 @@ public class MainMenuView extends StackPane {
 
         // 覆盖层：道具图鉴与设置（默认隐藏）
         galleryContent = createGalleryContent();
-        settingsContent = new SettingsOverlay(settings, () -> hideOverlay(settingsContent, this::fadeInMenu));
+        settingsContent = new SettingsOverlay(settings, nicknameSupplier,
+                () -> hideOverlay(settingsContent, this::fadeInMenu));
         settingsContent.setVisible(false);
         settingsContent.setManaged(false);
 
@@ -134,19 +140,7 @@ public class MainMenuView extends StackPane {
             }
         });
 
-        // 面板重新可见时复位所有动画状态并重播入场动画；不可见时停止背景动效
-        visibleProperty().addListener((obs, oldValue, newValue) -> {
-            if (newValue) {
-                resetForReentry();
-                backdrop.start();
-            } else {
-                backdrop.stop();
-            }
-        });
-
-        // 首次显示：直接播放入场动画并启动背景动效
-        playEnterAnimation();
-        backdrop.start();
+        resetForReentry();
     }
 
     /** 构建菜单主体：标题 + 副标题 + 分隔线 + 操作按钮（§8.2） */
@@ -169,6 +163,7 @@ public class MainMenuView extends StackPane {
         Button quitButton = createMenuButton("退出", () -> playExitTransition(onQuit));
 
         VBox box = new VBox(22.0, header, divider, startButton, galleryButton, settingsButton, quitButton);
+        box.getStyleClass().add("menu-panel");
         box.setAlignment(Pos.CENTER);
         box.setPadding(new Insets(40.0));
         return box;
@@ -290,6 +285,10 @@ public class MainMenuView extends StackPane {
 
     /** 打开覆盖层：菜单内容淡出 → 覆盖层滑入淡入 */
     private void showOverlay(VBox panel) {
+        if (transitionLocked) {
+            return;
+        }
+        transitionLocked = true;
         FadeTransition out = new FadeTransition(Duration.millis(150.0), menuContent);
         out.setToValue(0.0);
         out.setOnFinished(event -> {
@@ -303,13 +302,19 @@ public class MainMenuView extends StackPane {
             in.setToValue(1.0);
             TranslateTransition slide = new TranslateTransition(Duration.millis(OVERLAY_MS), panel);
             slide.setToY(0.0);
-            new ParallelTransition(in, slide).play();
+            ParallelTransition transition = new ParallelTransition(in, slide);
+            transition.setOnFinished(done -> transitionLocked = false);
+            transition.play();
         });
         out.play();
     }
 
     /** 收起覆盖层：覆盖层淡出 → 菜单内容重新显示（可指定淡入回调） */
     private void hideOverlay(VBox panel, Runnable onFinished) {
+        if (transitionLocked) {
+            return;
+        }
+        transitionLocked = true;
         FadeTransition out = new FadeTransition(Duration.millis(160.0), panel);
         out.setToValue(0.0);
         out.setOnFinished(event -> {
@@ -318,6 +323,7 @@ public class MainMenuView extends StackPane {
             menuContent.setVisible(true);
             menuContent.setManaged(true);
             onFinished.run();
+            transitionLocked = false;
         });
         out.play();
     }
@@ -332,6 +338,10 @@ public class MainMenuView extends StackPane {
 
     /** 开始游戏过渡：双界遮罩渐入 + 标题放大淡出；动画结束后调用 {@code onStart} 切入游戏界面 */
     private void playStartTransition(Runnable onStart) {
+        if (transitionLocked) {
+            return;
+        }
+        transitionLocked = true;
         overlay.setVisible(true);
         overlay.setManaged(true);
 
@@ -359,6 +369,10 @@ public class MainMenuView extends StackPane {
 
     /** 退出过渡：双界遮罩渐入后关闭窗口 */
     private void playExitTransition(Runnable onQuit) {
+        if (transitionLocked) {
+            return;
+        }
+        transitionLocked = true;
         overlay.setVisible(true);
         overlay.setManaged(true);
         FadeTransition fade = new FadeTransition(Duration.millis(300.0), overlay);
@@ -370,6 +384,7 @@ public class MainMenuView extends StackPane {
 
     /** 从游戏/暂停返回主菜单时复位所有动画状态（遮罩、标题、覆盖层、菜单内容） */
     private void resetForReentry() {
+        transitionLocked = false;
         overlay.setVisible(false);
         overlay.setManaged(false);
         overlay.setOpacity(0.0);
@@ -384,5 +399,17 @@ public class MainMenuView extends StackPane {
         settingsContent.setVisible(false);
         settingsContent.setManaged(false);
         playEnterAnimation();
+    }
+
+    @Override
+    public void onEnter() {
+        resetForReentry();
+        backdrop.onEnter();
+        requestFocus();
+    }
+
+    @Override
+    public void onExit() {
+        backdrop.onExit();
     }
 }
