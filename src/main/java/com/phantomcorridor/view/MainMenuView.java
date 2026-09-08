@@ -2,7 +2,6 @@ package com.phantomcorridor.view;
 
 import com.phantomcorridor.config.AppConfig;
 import com.phantomcorridor.config.Settings;
-import javafx.animation.AnimationTimer;
 import javafx.animation.FadeTransition;
 import javafx.animation.ParallelTransition;
 import javafx.animation.ScaleTransition;
@@ -11,8 +10,6 @@ import javafx.geometry.HPos;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.Node;
-import javafx.scene.canvas.Canvas;
-import javafx.scene.canvas.GraphicsContext;
 import javafx.scene.control.Button;
 import javafx.scene.control.Label;
 import javafx.scene.input.KeyCode;
@@ -21,44 +18,24 @@ import javafx.scene.layout.HBox;
 import javafx.scene.layout.Region;
 import javafx.scene.layout.StackPane;
 import javafx.scene.layout.VBox;
-import javafx.scene.paint.Color;
-import javafx.scene.paint.CycleMethod;
-import javafx.scene.paint.LinearGradient;
-import javafx.scene.paint.RadialGradient;
-import javafx.scene.paint.Stop;
-import javafx.scene.shape.StrokeLineCap;
 import javafx.util.Duration;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Random;
 
 /**
  * 主菜单面板（对应《双界行者》需求 §8.2 主菜单）。
  *
- * <p><b>双界（光/影）主题 —— 深蓝夜空 · 光弧 · 水面</b>：背景为静谧的<b>深蓝夜色</b>
- * （满天星斗），一束<b>发光的白色光弧</b>划过天际，并在下方<b>水面</b>上形成倒影。
- * 水面持续<b>涟漪闪烁、光影流动</b>（动态效果），呼应『光与影两界并存、相互映照』
- * （§2 核心卖点『光与影两界并存、需不断穿梭』）。
+ * <p><b>「夜空 · 双辉」主题</b>：背景复用 {@link NightSkyBackdrop} —— 深蓝夜空、满天星斗、
+ * 一道<b>白金色光弧</b>（光之界）划空并在<b>深紫蓝色水面</b>（影之界）投下粼粼倒影，
+ * 呼应『光与影两界并存、相互映照』的核心设定（§2 卖点）。
  *
- * <p><b>动态效果</b>（在原有按钮动效基础上新增）：
- * <ul>
- *   <li>水面：光弧倒影<b>粼粼闪动</b> + 横向涟漪随波流动；</li>
- *   <li>天际：星点微微<b>闪烁</b>；光弧辉光<b>呼吸</b>。</li>
- * </ul>
- *
- * <p><b>按钮动效（参考原项目保留）</b>：悬停轻微放大 + 前置符文光标 ✦ 淡入；
- * 菜单入场标题/分隔线/按钮依次淡入上浮；覆盖层滑入滑出。
+ * <p><b>按钮动效</b>：悬停轻微放大 + 前置符文光标 ✦ 淡入；菜单入场标题/分隔线/按钮依次
+ * 淡入上浮；覆盖层滑入滑出；开始/退出游戏时双界遮罩渐入。
  *
  * <p><b>菜单按钮顺序</b>（§8.2）：开始游戏 / 道具图鉴 / 设置 / 退出。
  */
 public class MainMenuView extends StackPane {
-
-    /** 星点数量（天际远景，随夜色微微闪烁） */
-    private static final int STAR_COUNT = 48;
-
-    /** 水面涟漪条带数量 */
-    private static final int RIPPLE_COUNT = 26;
 
     /** 入场动画：相邻元素错峰间隔（毫秒） */
     private static final double ENTER_STEP_MS = 70.0;
@@ -82,7 +59,7 @@ public class MainMenuView extends StackPane {
     private static final String SUBTITLE = "光与影 · 皆通途";
 
     /** 底部版本信息文本 */
-    private static final String FOOTER = "v0.3.0 · 双界行者 · JavaFX Roguelike 可玩原型";
+    private static final String FOOTER = "v0.3.1 · 双界行者 · JavaFX Roguelike 可玩原型";
 
     /** 标题节点（开始过渡动画需要引用） */
     private final Label title = new Label(TITLE);
@@ -99,32 +76,8 @@ public class MainMenuView extends StackPane {
     /** 双界过渡遮罩（开始游戏/退出时渐入） */
     private final Region overlay;
 
-    /** 夜景背景画布（绘制夜空 / 光弧 / 水面倒影 / 涟漪动效） */
-    private final Canvas backdrop = new Canvas(AppConfig.VIEW_WIDTH, AppConfig.VIEW_HEIGHT);
-
-    /** 背景动效定时器（绘制夜空光弧与水面涟漪；面板不可见时停止） */
-    private final AnimationTimer backdropTimer;
-
-    /** 随机数源（星点/涟漪初始化） */
-    private final Random random = new Random();
-
-    /** 星点横坐标（相对视口宽的比例） */
-    private final double[] starX = new double[STAR_COUNT];
-
-    /** 星点纵坐标（相对视口高的比例，位于天空区） */
-    private final double[] starY = new double[STAR_COUNT];
-
-    /** 星点相位（错开闪烁） */
-    private final double[] starPhase = new double[STAR_COUNT];
-
-    /** 涟漪所在横坐标（水面，相对视口宽的比例） */
-    private final double[] rippleX = new double[RIPPLE_COUNT];
-
-    /** 涟漪纵向位置偏移（相对水面区） */
-    private final double[] rippleY = new double[RIPPLE_COUNT];
-
-    /** 涟漪相位（错开波动） */
-    private final double[] ripplePhase = new double[RIPPLE_COUNT];
+    /** 夜空双辉背景（星空 / 白金光弧 / 紫影倒影与涟漪动效） */
+    private final NightSkyBackdrop backdrop;
 
     /**
      * 构建主菜单面板。
@@ -136,10 +89,10 @@ public class MainMenuView extends StackPane {
     public MainMenuView(Runnable onStart, Runnable onQuit, Settings settings) {
         getStyleClass().add("main-menu-pane");
 
-        // 背景画布置于最底层（夜空光弧 + 水面动效）；菜单内容等叠加其上
+        // 背景置于最底层（夜空光弧 + 水面动效）；菜单内容等叠加其上
+        backdrop = new NightSkyBackdrop(AppConfig.VIEW_WIDTH, AppConfig.VIEW_HEIGHT);
         backdrop.setManaged(false);
         getChildren().add(backdrop);
-        initScene();
 
         title.getStyleClass().add("menu-title");
         menuContent = createMenuContent(onStart, onQuit);
@@ -182,33 +135,18 @@ public class MainMenuView extends StackPane {
         });
 
         // 面板重新可见时复位所有动画状态并重播入场动画；不可见时停止背景动效
-        backdropTimer = createBackdropTimer();
         visibleProperty().addListener((obs, oldValue, newValue) -> {
             if (newValue) {
                 resetForReentry();
-                backdropTimer.start();
+                backdrop.start();
             } else {
-                backdropTimer.stop();
+                backdrop.stop();
             }
         });
 
         // 首次显示：直接播放入场动画并启动背景动效
         playEnterAnimation();
-        backdropTimer.start();
-    }
-
-    /** 初始化星点与涟漪的随机参数（只执行一次） */
-    private void initScene() {
-        for (int i = 0; i < STAR_COUNT; i++) {
-            starX[i] = random.nextDouble();
-            starY[i] = random.nextDouble() * 0.50;            // 天空区（视口上半部分略多）
-            starPhase[i] = random.nextDouble() * Math.PI * 2.0;
-        }
-        for (int i = 0; i < RIPPLE_COUNT; i++) {
-            rippleX[i] = random.nextDouble();
-            rippleY[i] = random.nextDouble();                 // 水面区相对位置
-            ripplePhase[i] = random.nextDouble() * Math.PI * 2.0;
-        }
+        backdrop.start();
     }
 
     /** 构建菜单主体：标题 + 副标题 + 分隔线 + 操作按钮（§8.2） */
@@ -219,7 +157,7 @@ public class MainMenuView extends StackPane {
         VBox header = new VBox(10.0, title, subtitle);
         header.setAlignment(Pos.CENTER);
 
-        // 白→蓝渐变分隔线（纯样式 Region，见 ui.css .menu-divider）
+        // 白金→紫渐变分隔线（纯样式 Region，见 ui.css .menu-divider）
         Region divider = new Region();
         divider.getStyleClass().add("menu-divider");
 
@@ -278,7 +216,7 @@ public class MainMenuView extends StackPane {
         return row + 1;
     }
 
-    /** 统一创建菜单按钮：绑定动作 + 悬停动效（放大 + 前置符文光标淡入），沿用原项目动效。
+    /** 统一创建菜单按钮：绑定动作 + 悬停动效（放大 + 前置符文光标淡入）。
      *  <p>文字严格居中：图形内容为「光标 + 文本 + 等宽隐形占位」的对称组合，
      *  光标淡入/淡出不改变文本位置，仅增加氛围。 */
     private Button createMenuButton(String text, Runnable action) {
@@ -446,158 +384,5 @@ public class MainMenuView extends StackPane {
         settingsContent.setVisible(false);
         settingsContent.setManaged(false);
         playEnterAnimation();
-    }
-
-    /** 创建背景动效定时器：每帧重绘夜空/光弧/水面涟漪（time 以秒计） */
-    private AnimationTimer createBackdropTimer() {
-        return new AnimationTimer() {
-            private long lastNanos = -1L;
-            private double time = 0.0;
-
-            @Override
-            public void handle(long now) {
-                if (lastNanos < 0L) {
-                    lastNanos = now;
-                    return;
-                }
-                double dt = Math.min((now - lastNanos) / 1_000_000_000.0, 0.1);
-                lastNanos = now;
-                time += dt;
-                renderBackdrop(time);
-            }
-        };
-    }
-
-    /** 绘制夜景背景：深蓝夜空 + 星光 + 白色光弧 + 地平线 + 水面倒影 + 涟漪动效 */
-    private void renderBackdrop(double time) {
-        GraphicsContext g = backdrop.getGraphicsContext2D();
-        double w = backdrop.getWidth();
-        double h = backdrop.getHeight();
-        double horizonY = h * 0.58;
-
-        // ---- 深蓝夜空（上半部） ----
-        LinearGradient sky = new LinearGradient(0, 0, 0, horizonY, false, CycleMethod.NO_CYCLE,
-                new Stop(0.0, Color.web("#0a1a3e")),
-                new Stop(0.45, Color.web("#16335f")),
-                new Stop(0.85, Color.web("#1f427a")),
-                new Stop(1.0, Color.web("#0a1834")));
-        g.setFill(sky);
-        g.fillRect(0, 0, w, horizonY);
-
-        // ---- 星点（微微闪烁） ----
-        for (int i = 0; i < STAR_COUNT; i++) {
-            double twinkle = 0.35 + 0.55 * (0.5 + 0.5 * Math.sin(time * 1.4 + starPhase[i]));
-            g.setFill(Color.rgb(255, 255, 255, Math.max(0.0, twinkle)));
-            double sx = starX[i] * w;
-            double sy = starY[i] * horizonY;
-            double sr = 0.8 + (i % 3) * 0.5;
-            g.fillOval(sx - sr, sy - sr, sr * 2, sr * 2);
-        }
-
-        // ---- 深蓝水面（下半部） ----
-        LinearGradient water = new LinearGradient(0, horizonY, 0, h, false, CycleMethod.NO_CYCLE,
-                new Stop(0.0, Color.web("#17325f")),
-                new Stop(0.35, Color.web("#0e2248")),
-                new Stop(1.0, Color.web("#030a1c")));
-        g.setFill(water);
-        g.fillRect(0, horizonY, w, h - horizonY);
-
-        // ---- 地平线暗带 + 亮线 ----
-        g.setFill(Color.web("#040b18"));
-        g.fillRect(0, horizonY - 2, w, 5);
-        g.setStroke(Color.rgb(160, 195, 240, 0.35));
-        g.setLineWidth(1.2);
-        g.strokeLine(0, horizonY, w, horizonY);
-
-        // ---- 白色光弧（天际） ----
-        double trailIn = Math.min(0.9, 0.4 + 0.12 * Math.sin(time * 0.9)); // 光弧辉光"呼吸"
-        drawTrail(g, w, horizonY, false, time, trailIn);
-
-        // ---- 水面倒影（镜像，粼粼闪动） ----
-        double reflectIn = 0.30 + 0.16 * Math.sin(time * 2.6);             // 倒影明暗闪动
-        drawTrail(g, w, horizonY, true, time, Math.max(0.08, reflectIn));
-
-        // ---- 水面涟漪（横向光带随波流动） ----
-        drawRipples(g, w, h, horizonY, time);
-
-        // ---- 光弧源头在水面的竖向光柱 + 高光点（强调光与影的交汇） ----
-        double sourceX = w * 0.14;
-        double sourceY = horizonY;
-        // 竖向光柱（水中的光路，呼吸闪动）
-        LinearGradient col = new LinearGradient(sourceX, horizonY, sourceX, h, false, CycleMethod.NO_CYCLE,
-                new Stop(0.0, Color.rgb(235, 244, 255, 0.30 + 0.12 * Math.sin(time * 2.0))),
-                new Stop(1.0, Color.rgb(235, 244, 255, 0.0)));
-        g.setFill(col);
-        g.beginPath();
-        g.moveTo(sourceX - 5, sourceY);
-        g.lineTo(sourceX + 5, sourceY);
-        g.lineTo(sourceX + 26, h);
-        g.lineTo(sourceX - 26, h);
-        g.closePath();
-        g.fill();
-    }
-
-    /** 绘制光弧（天际或被水面镜像）。{@code reflect=true} 时绘制水中倒影（y 关于地平线对称） */
-    private void drawTrail(GraphicsContext g, double w, double horizonY,
-                           boolean reflect, double time, double intensity) {
-        // 天际基准控制点：起点在地平线附近(左下) → 控制点高抬 → 终点右上
-        double p0x = w * 0.12, p0y = horizonY * 0.95;
-        double p1x = w * 0.50, p1y = horizonY * 0.06;
-        double p2x = w * 0.90, p2y = horizonY * 0.40;
-        if (reflect) {
-            // 水中镜像：y 关于地平线对称（向下），横向轻微左右漂移
-            double drift = Math.sin(time * 1.3) * 6.0;
-            p0x += drift; p1x += drift * 0.5; p2x += drift * 0.3;
-            p0y = 2 * horizonY - p0y;
-            p1y = 2 * horizonY - p1y;
-            p2y = 2 * horizonY - p2y;
-        }
-        double alpha = reflect ? intensity : (0.45 + 0.35 * intensity);
-
-        g.setLineCap(StrokeLineCap.ROUND);
-        // 三层发光：外晕 → 中晕 → 亮芯
-        g.setStroke(Color.rgb(255, 255, 255, 0.10 * alpha));
-        g.setLineWidth(18);
-        strokeQuad(g, p0x, p0y, p1x, p1y, p2x, p2y);
-        g.setStroke(Color.rgb(255, 255, 255, 0.38 * alpha));
-        g.setLineWidth(8);
-        strokeQuad(g, p0x, p0y, p1x, p1y, p2x, p2y);
-        g.setStroke(Color.rgb(255, 255, 255, 0.92 * alpha));
-        g.setLineWidth(2.6);
-        strokeQuad(g, p0x, p0y, p1x, p1y, p2x, p2y);
-
-        // 光弧源头高光（天际起点处最亮，像光源）
-        if (!reflect) {
-            double glowR = 16.0 + 4.0 * Math.sin(time * 2.0);
-            RadialGradient glow = new RadialGradient(0, 0, 0, 0, glowR, false, CycleMethod.NO_CYCLE,
-                    new Stop(0.0, Color.rgb(255, 255, 255, 0.95)),
-                    new Stop(0.4, Color.rgb(255, 255, 255, 0.5)),
-                    new Stop(1.0, Color.TRANSPARENT));
-            g.setFill(glow);
-            g.fillOval(p0x - glowR, p0y - glowR, glowR * 2, glowR * 2);
-        }
-    }
-
-    /** 绘制一条二次贝塞尔曲线 */
-    private void strokeQuad(GraphicsContext g, double x0, double y0, double x1, double y1,
-                            double x2, double y2) {
-        g.beginPath();
-        g.moveTo(x0, y0);
-        g.quadraticCurveTo(x1, y1, x2, y2);
-        g.stroke();
-    }
-
-    /** 绘制水面横向涟漪条带（随波流动、明暗闪烁） */
-    private void drawRipples(GraphicsContext g, double w, double h, double horizonY, double time) {
-        for (int i = 0; i < RIPPLE_COUNT; i++) {
-            double ry = horizonY + rippleY[i] * (h - horizonY);
-            double flicker = 0.16 + 0.14 * Math.sin(time * 1.7 + ripplePhase[i]);
-            double len = 18.0 + rippleX[i] * 60.0;
-            double cx = rippleX[i] * w + Math.sin(time * 0.8 + ripplePhase[i]) * 14.0;
-            double alpha = Math.max(0.03, flicker);
-            g.setStroke(Color.rgb(190, 215, 245, alpha));
-            g.setLineWidth(1.1);
-            g.strokeLine(cx - len * 0.5, ry, cx + len * 0.5, ry);
-        }
     }
 }

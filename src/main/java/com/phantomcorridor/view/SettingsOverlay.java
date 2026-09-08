@@ -58,7 +58,6 @@ public class SettingsOverlay extends VBox {
      */
     public SettingsOverlay(Settings settings, Runnable onBack) {
         this.settings = settings;
-        getStyleClass().add("overlay-panel");
         setAlignment(Pos.CENTER);
         setFillWidth(false); // 各行保持自然宽度并整体居中，避免内容被拉伸后贴向一侧
         setMaxWidth(VBox.USE_PREF_SIZE);
