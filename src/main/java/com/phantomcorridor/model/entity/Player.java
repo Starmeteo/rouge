@@ -20,6 +20,7 @@ public final class Player {
     private double animationTime;
     private double facingX;
     private double facingY;
+    private double hitInvulnerability;
     private final List<ItemType> items = new ArrayList<>();
 
     public Player(double x, double y) {
@@ -36,6 +37,7 @@ public final class Player {
         this.animationTime = 0.0;
         this.facingX = 1.0;
         this.facingY = 0.0;
+        this.hitInvulnerability = 0.0;
         this.items.clear();
     }
 
@@ -65,6 +67,7 @@ public final class Player {
 
     public void updateAnimation(double dt, double movementX, double movementY, boolean attacking,
                                 boolean shifting) {
+        hitInvulnerability = Math.max(0.0, hitInvulnerability - Math.max(0.0, dt));
         animationTime += Math.max(0.0, dt);
         if (movementX != 0.0 || movementY != 0.0) {
             double length = Math.hypot(movementX, movementY);
@@ -85,6 +88,14 @@ public final class Player {
         this.y = y;
     }
 
+    /** 受击具有短暂无敌时间，避免一帧内被重叠弹幕重复扣血。 */
+    public boolean takeDamage(int damage) {
+        if (damage <= 0 || hitInvulnerability > 0.0 || hp <= 0) return false;
+        hp = Math.max(0, hp - damage);
+        hitInvulnerability = GameConfig.PLAYER_HIT_INVULNERABILITY;
+        return true;
+    }
+
     public int getHp() { return hp; }
     public double getX() { return x; }
     public double getY() { return y; }
@@ -95,6 +106,7 @@ public final class Player {
     public double getFacingX() { return facingX; }
     public double getFacingY() { return facingY; }
     public List<ItemType> getItems() { return Collections.unmodifiableList(items); }
+    public boolean isHitInvulnerable() { return hitInvulnerability > 0.0; }
 
     private static double clamp(double value, double min, double max) {
         return Math.max(min, Math.min(max, value));

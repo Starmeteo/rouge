@@ -35,6 +35,16 @@ public final class GameConfig {
     public static final double SHADOW_MELEE_VISIBLE_TIME = 0.13;
     public static final double SHADOW_ATTACK_COOLDOWN = 0.15;
 
+    // ---- 第 6 天：敌人与房间战斗 ----
+    /** 普通战斗房的敌人数量（含可能替换其中一只的精英）。 */
+    public static final int BATTLE_ENEMY_MIN = 5;
+    public static final int BATTLE_ENEMY_MAX = 7;
+    public static final double ENEMY_ALERT_TIME = 0.6;
+    public static final double ENEMY_PROJECTILE_SPEED = 190.0;
+    public static final double ENEMY_PROJECTILE_LIFETIME = 3.0;
+    public static final double ENEMY_PROJECTILE_RADIUS = 12.0;
+    public static final double PLAYER_HIT_INVULNERABILITY = 0.65;
+
     // ---- 玩家生命 ----
     /** 玩家最大生命值（需求未对双界版给出明确数值，沿用旧版 3 点作为占位，待 §7.2 道具加成时校调） */
     public static final int PLAYER_MAX_HP = 3;

@@ -2,11 +2,11 @@ package com.phantomcorridor.model;
 
 import com.phantomcorridor.config.AppConfig;
 import com.phantomcorridor.config.GameConfig;
-import com.phantomcorridor.config.RoomConfig;
 import com.phantomcorridor.model.effect.WorldShiftSystem;
 import com.phantomcorridor.model.entity.Player;
 import com.phantomcorridor.model.combat.PlayerAttackSystem;
 import com.phantomcorridor.model.combat.EnemyProjectileSystem;
+import com.phantomcorridor.model.combat.EnemySystem;
 import com.phantomcorridor.model.dungeon.MapGenerator;
 import com.phantomcorridor.model.room.RoomNavigationSystem;
 
@@ -17,6 +17,7 @@ public final class GameSession {
     private final WorldShiftSystem worldShift = new WorldShiftSystem();
     private final PlayerAttackSystem attackSystem = new PlayerAttackSystem();
     private final EnemyProjectileSystem enemyProjectiles = new EnemyProjectileSystem();
+    private final EnemySystem enemies = new EnemySystem();
     private final RoomNavigationSystem navigation = new RoomNavigationSystem();
     private long dungeonSeed;
     private double phasePulseVisibleRemaining;
@@ -25,8 +26,6 @@ public final class GameSession {
     private String roomAnnouncement = "";
     private double roomAnnouncementRemaining;
     private boolean combatActive;
-    private int lightEnemyCount;
-    private int shadowEnemyCount;
     private int coins;
 
     public void newRun() { newRun(""); }
@@ -36,18 +35,18 @@ public final class GameSession {
         worldShift.reset();
         attackSystem.reset();
         enemyProjectiles.reset();
+        enemies.reset();
         phasePulseVisibleRemaining = 0.0;
         roomAnnouncement = "入口房";
         roomAnnouncementRemaining = 2.2;
         aimX = player.getX() + 1.0;
         aimY = player.getY();
         combatActive = false;
-        lightEnemyCount = 0;
-        shadowEnemyCount = 0;
         coins = 0;
         dungeonSeed = MapGenerator.parseSeed(configuredSeed);
         navigation.reset(new MapGenerator().generate(dungeonSeed));
         navigation.placeAtEntrance(player);
+        enemies.enterRoom(navigation.getCurrentRoom(), dungeonSeed, player, navigation);
     }
 
     public void update(double dt, double movementX, double movementY,
@@ -60,10 +59,18 @@ public final class GameSession {
         navigation.move(player, movementX, movementY, dt);
         if (navigation.consumeRoomChanged()) {
             attackSystem.clearTransientAttacks();
+            enemies.enterRoom(navigation.getCurrentRoom(), dungeonSeed, player, navigation);
             roomAnnouncement = roomTypeLabel(navigation.getCurrentRoom().type());
             roomAnnouncementRemaining = 2.2;
         }
         attackSystem.update(dt, navigation);
+        enemies.update(dt, player, attackSystem, navigation);
+        if (navigation.getCurrentRoom().type() == RoomType.BATTLE || navigation.getCurrentRoom().type() == RoomType.BOSS) {
+            navigation.getCurrentRoom().setCleared(enemies.isRoomCleared());
+        }
+        int kills = enemies.consumeKills();
+        if (kills > 0) player.restorePhaseEnergy(kills * GameConfig.PHASE_ENERGY_PER_FRAGMENT);
+        combatActive = !enemies.isRoomCleared();
         if (!combatActive) {
             player.restorePhaseEnergy(GameConfig.PHASE_ENERGY_REGEN_PER_SEC * dt);
         }
@@ -86,6 +93,7 @@ public final class GameSession {
             enemyProjectiles.clearWithin(player.getX(), player.getY(), GameConfig.PHASE_PULSE_RADIUS);
             phasePulseVisibleRemaining = GameConfig.PHASE_PULSE_VISIBLE_TIME;
         }
+        enemies.onWorldChanged(player.getCurrentWorld());
         return true;
     }
 
@@ -93,11 +101,12 @@ public final class GameSession {
     public WorldShiftSystem getWorldShift() { return worldShift; }
     public PlayerAttackSystem getAttackSystem() { return attackSystem; }
     public EnemyProjectileSystem getEnemyProjectiles() { return enemyProjectiles; }
+    public EnemySystem getEnemies() { return enemies; }
     public boolean isPhasePulseVisible() { return phasePulseVisibleRemaining > 0.0; }
     public double getAimX() { return aimX; }
     public double getAimY() { return aimY; }
-    public int getLightEnemyCount() { return lightEnemyCount; }
-    public int getShadowEnemyCount() { return shadowEnemyCount; }
+    public int getLightEnemyCount() { return enemies.getCount(WorldType.LIGHT); }
+    public int getShadowEnemyCount() { return enemies.getCount(WorldType.SHADOW); }
     public int getCoins() { return coins; }
     public RoomNavigationSystem getNavigation() { return navigation; }
     public long getDungeonSeed() { return dungeonSeed; }
