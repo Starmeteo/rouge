@@ -4,12 +4,11 @@
  * <p>当前实现：
  * <ul>
  *   <li>{@link com.phantomcorridor.controller.SceneManager} —— 统一场景切换（§9.3）；</li>
- *   <li>{@link com.phantomcorridor.controller.AppLauncher} 之外的运行时编排由
- *       {@code com.phantomcorridor.App}（JavaFX Application 主类）承担。</li>
+ *   <li>{@link com.phantomcorridor.controller.LoginController} —— 登录校验与档案写入；</li>
+ *   <li>{@link com.phantomcorridor.controller.MainMenuController} —— 菜单事件编排；</li>
+ *   <li>{@link com.phantomcorridor.controller.GameController} —— 输入、模型更新与渲染调度。</li>
  * </ul>
  *
- * <p>后续每个场景（登录/主菜单/游戏/结算）对应各自 Controller（LoginController 等）时，
- * 负责把 view 层的 UI 事件转发为对 model 的调用，并触发 {@link SceneManager} 切换。
- * 现阶段各场景面板较薄，直接通过回调交给 App/SceneManager 编排即可，避免过早拆分空壳类。
+ * <p>控制器把 view 层事件转发为对 model 的调用；App 仅保留顶层场景流转。
  */
 package com.phantomcorridor.controller;

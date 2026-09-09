@@ -2,8 +2,12 @@ package com.phantomcorridor;
 
 import com.phantomcorridor.config.AppConfig;
 import com.phantomcorridor.config.Settings;
+import com.phantomcorridor.controller.GameController;
+import com.phantomcorridor.controller.LoginController;
+import com.phantomcorridor.controller.MainMenuController;
 import com.phantomcorridor.controller.SceneManager;
 import com.phantomcorridor.core.GameState;
+import com.phantomcorridor.model.PlayerProfile;
 import com.phantomcorridor.view.GameView;
 import com.phantomcorridor.view.LoginView;
 import com.phantomcorridor.view.MainMenuView;
@@ -50,22 +54,27 @@ public class App extends Application {
     private MainMenuView mainMenuView;
     private GameView gameView;
     private PauseView pauseView;
+    private SceneManager sceneManager;
+    private GameController gameController;
 
     @Override
     public void start(Stage stage) {
         this.stage = stage;
 
-        // 全局设置对象：由登录界面写昵称、设置面板读写其它项，后续天数接入消费
+        // 玩家档案与偏好设置分离，恢复默认设置不会再清空玩家身份。
         Settings settings = new Settings();
+        PlayerProfile profile = PlayerProfile.loadLocal();
+        sceneManager = new SceneManager(root);
 
-        // 面板之间不直接相互引用，全部通过回调交给本类编排，降低耦合
-        loginView = new LoginView(settings, this::showMainMenu);
-        mainMenuView = new MainMenuView(this::showGame, () -> stage.close(), settings);
-        gameView = new GameView(this::showPause);
+        LoginController loginController = new LoginController(profile, this::showMainMenu);
+        MainMenuController mainMenuController = new MainMenuController(
+                this::showGame, stage::close, settings, profile);
+        loginView = loginController.getView();
+        mainMenuView = mainMenuController.getView();
+        gameView = new GameView();
+        gameController = new GameController(gameView, this::showPause, settings);
         pauseView = new PauseView(this::resumeGame, this::showMainMenu);
         root.getChildren().addAll(loginView, mainMenuView, gameView, pauseView);
-
-        SceneManager.init(root);
 
         Scene scene = new Scene(root, AppConfig.VIEW_WIDTH, AppConfig.VIEW_HEIGHT);
         scene.getStylesheets().add(getClass().getResource("ui/ui.css").toExternalForm());
@@ -92,39 +101,27 @@ public class App extends Application {
 
     /** 进入登录界面（应用启动默认） */
     private void showLogin() {
-        SceneManager.setState(GameState.LOGIN);
-        SceneManager.switchTo(loginView);
-        loginView.requestFocus();
+        sceneManager.switchTo(GameState.LOGIN, loginView);
     }
 
     /** 切换到主菜单（登录成功，或从暂停界面/结算返回） */
     public void showMainMenu() {
-        // 无论当前是否处于游戏中，停止主循环都是安全的（GameView 内部保证幂等）
-        gameView.onLeave();
-        SceneManager.setState(GameState.MAIN_MENU);
-        SceneManager.switchTo(mainMenuView);
-        mainMenuView.requestFocus();
+        sceneManager.switchTo(GameState.MAIN_MENU, mainMenuView);
     }
 
     /** 进入游戏界面（主菜单点击"开始游戏"） */
     public void showGame() {
-        SceneManager.setState(GameState.PLAYING);
-        SceneManager.switchTo(gameView);
-        gameView.onEnter(); // 启动主循环并请求键盘焦点
+        gameController.newRun();
+        sceneManager.switchTo(GameState.PLAYING, gameView);
     }
 
     /** 打开暂停界面（游戏中按 Esc/P 或点击暂停） */
     public void showPause() {
-        SceneManager.setState(GameState.PAUSED);
-        SceneManager.switchTo(pauseView);
-        gameView.onLeave(); // 暂停即停止主循环，节省 CPU
-        pauseView.requestFocus();
+        sceneManager.showOverlay(GameState.PAUSED, pauseView);
     }
 
     /** 恢复游戏（暂停界面点击"继续游戏"或按 Esc/P） */
     public void resumeGame() {
-        SceneManager.setState(GameState.PLAYING);
-        SceneManager.switchTo(gameView);
-        gameView.onEnter();
+        sceneManager.switchTo(GameState.PLAYING, gameView);
     }
 }

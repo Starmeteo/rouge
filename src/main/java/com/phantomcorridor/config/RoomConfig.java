@@ -14,12 +14,18 @@ package com.phantomcorridor.config;
  */
 public final class RoomConfig {
 
+    /** 玩家中心距离房间边缘的最小距离（像素）。 */
+    public static final double ROOM_INNER_PADDING = 54.0;
+
     // ---- 房间可视区域大小（双界共用同一房间布局；全画布尺寸，内部走廊/障碍物由模板决定） ----
     /** 房间宽度（像素），与逻辑视口一致 */
     public static final double ROOM_WIDTH = AppConfig.VIEW_WIDTH;
 
     /** 房间高度（像素），与逻辑视口一致 */
     public static final double ROOM_HEIGHT = AppConfig.VIEW_HEIGHT;
+    public static final int DEFAULT_ROOM_COUNT = 9;
+    public static final double DOOR_HALF_WIDTH = 74.0;
+    public static final double SHIFT_ESCAPE_SEARCH_RADIUS = 180.0;
 
     // ---- 房间类型默认生成权重（第 5 天接入；权重越大越易生成） ----
     /** 入口房间权重（每层固定 1 个，权重仅供占位） */
