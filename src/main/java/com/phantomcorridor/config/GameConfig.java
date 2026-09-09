@@ -16,7 +16,8 @@ public final class GameConfig {
 
     // ---- 玩家半径与移动（§3.2 光/影形态，§8.4 形态差异待世界切换系统接入） ----
     /** 玩家碰撞半径（像素） */
-    public static final double PLAYER_RADIUS = 14.0;
+    /** 角色碰撞半径，覆盖披风/武器的主要身体范围。 */
+    public static final double PLAYER_RADIUS = 28.0;
 
     /** 玩家基础移动速度（像素/秒，占位值，后续形体差异在此扩展） */
     public static final double PLAYER_BASE_SPEED = 200.0;
@@ -29,8 +30,8 @@ public final class GameConfig {
     public static final double LIGHT_PROJECTILE_RADIUS = 6.0;
     public static final double LIGHT_PROJECTILE_LIFETIME = 1.8;
     public static final double LIGHT_ATTACK_COOLDOWN = 0.22;
-    public static final double SHADOW_MELEE_RANGE = 92.0;
-    public static final double SHADOW_MELEE_ARC_DEGREES = 110.0;
+    public static final double SHADOW_MELEE_RANGE = 120.0;
+    public static final double SHADOW_MELEE_ARC_DEGREES = 300.0;
     public static final double SHADOW_MELEE_VISIBLE_TIME = 0.13;
     public static final double SHADOW_ATTACK_COOLDOWN = 0.15;
 

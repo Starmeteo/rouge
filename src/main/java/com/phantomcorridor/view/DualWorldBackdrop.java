@@ -77,6 +77,7 @@ public final class DualWorldBackdrop extends Canvas implements SceneLifecycle {
 
     private void draw(double time) {
         GraphicsContext g = getGraphicsContext2D();
+        g.setImageSmoothing(false);
         double w = getWidth();
         double h = getHeight();
 
@@ -97,19 +98,14 @@ public final class DualWorldBackdrop extends Canvas implements SceneLifecycle {
 
     private void drawDomainGlow(GraphicsContext g, double w, double h, double time) {
         double pulse = 0.88 + Math.sin(time * 0.7) * 0.06;
-        g.setFill(new RadialGradient(0, 0, w * 0.18, h * 0.28, w * 0.62,
-                false, CycleMethod.NO_CYCLE,
-                new Stop(0.0, Color.rgb(232, 193, 107, 0.30 * pulse)),
-                new Stop(0.55, Color.rgb(116, 78, 32, 0.10)),
-                new Stop(1.0, Color.TRANSPARENT)));
-        g.fillRect(0, 0, w * 0.62, h);
-
-        g.setFill(new RadialGradient(0, 0, w * 0.86, h * 0.42, w * 0.62,
-                false, CycleMethod.NO_CYCLE,
-                new Stop(0.0, Color.rgb(113, 65, 181, 0.26 * pulse)),
-                new Stop(0.58, Color.rgb(46, 20, 86, 0.13)),
-                new Stop(1.0, Color.TRANSPARENT)));
-        g.fillRect(w * 0.38, 0, w * 0.62, h);
+        for (int band = 0; band < 6; band++) {
+            double inset = band * 48.0;
+            double alpha = (0.20 - band * 0.026) * pulse;
+            g.setFill(Color.rgb(214, 166, 74, alpha));
+            g.fillRect(inset, inset, w * 0.50 - inset, h - inset * 2);
+            g.setFill(Color.rgb(105, 58, 166, alpha));
+            g.fillRect(w * 0.52, inset, w * 0.48 - inset, h - inset * 2);
+        }
     }
 
     private void drawStoneFloor(GraphicsContext g, double w, double h) {
@@ -140,8 +136,7 @@ public final class DualWorldBackdrop extends Canvas implements SceneLifecycle {
                     new Stop(0.49, Color.rgb(190, 157, 112, alpha * 0.42)),
                     new Stop(0.53, Color.rgb(119, 72, 176, alpha * 0.50)),
                     new Stop(1.0, Color.rgb(125, 77, 197, alpha))));
-            g.strokeRoundRect(inset, top, w - inset * 2.0, h - top + 110.0,
-                    250.0 - i * 20.0, 250.0 - i * 20.0);
+            g.strokeRect(snap(inset), snap(top), snap(w - inset * 2.0), snap(h - top + 110.0));
         }
     }
 
@@ -155,7 +150,7 @@ public final class DualWorldBackdrop extends Canvas implements SceneLifecycle {
             g.setLineWidth(1.4);
             for (int ring = 0; ring < 3; ring++) {
                 double radius = 45.0 + ring * 18.0;
-                g.strokeOval(cx - radius, cy - radius, radius * 2, radius * 2);
+                g.strokeRect(snap(cx - radius), snap(cy - radius), snap(radius * 2), snap(radius * 2));
             }
             for (int spoke = 0; spoke < 8; spoke++) {
                 double angle = spoke * Math.PI / 4.0 + time * (side == 0 ? 0.025 : -0.025);
@@ -172,9 +167,9 @@ public final class DualWorldBackdrop extends Canvas implements SceneLifecycle {
             double alpha = 0.18 + 0.30 * (0.5 + 0.5 * Math.sin(time * 1.4 + motePhase[i]));
             double x = moteX[i] * w + Math.sin(time * 0.45 + motePhase[i]) * 8.0;
             double y = moteY[i] * h;
-            double radius = 1.0 + (i % 3) * 0.55;
+            double radius = 2.0 + (i % 3) * 2.0;
             g.setFill(Color.color(color.getRed(), color.getGreen(), color.getBlue(), alpha));
-            g.fillOval(x - radius, y - radius, radius * 2, radius * 2);
+            g.fillRect(snap(x - radius), snap(y - radius), radius * 2, radius * 2);
         }
     }
 
@@ -187,9 +182,9 @@ public final class DualWorldBackdrop extends Canvas implements SceneLifecycle {
             g.setLineWidth(layer == 0 ? 1.5 : 5.0 + layer * 5.0);
             g.beginPath();
             for (int y = -20; y <= h + 20; y += 12) {
-                double x = baseX
+                double x = snap(baseX
                         + Math.sin(y * 0.020 + time * 0.65) * 10.0
-                        + Math.sin(y * 0.053 - time * 0.44) * 4.0;
+                        + Math.sin(y * 0.053 - time * 0.44) * 4.0);
                 if (y == -20) g.moveTo(x, y); else g.lineTo(x, y);
             }
             g.stroke();
@@ -197,10 +192,12 @@ public final class DualWorldBackdrop extends Canvas implements SceneLifecycle {
     }
 
     private void drawVignette(GraphicsContext g, double w, double h) {
-        g.setFill(new RadialGradient(0, 0, w / 2.0, h / 2.0, w * 0.72,
-                false, CycleMethod.NO_CYCLE,
-                new Stop(0.52, Color.TRANSPARENT),
-                new Stop(1.0, Color.rgb(0, 0, 0, 0.70))));
-        g.fillRect(0, 0, w, h);
+        for (int i = 0; i < 5; i++) {
+            g.setStroke(Color.rgb(0, 0, 0, 0.13 + i * 0.055));
+            g.setLineWidth(32);
+            g.strokeRect(i * 16, i * 16, w - i * 32, h - i * 32);
+        }
     }
+
+    private static double snap(double value) { return Math.round(value / 4.0) * 4.0; }
 }

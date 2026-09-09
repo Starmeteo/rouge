@@ -22,8 +22,14 @@ class MapGeneratorTest {
             assertEquals(first.rooms().get(i).type(), second.rooms().get(i).type());
             assertEquals(first.rooms().get(i).mapX(), second.rooms().get(i).mapX());
             assertEquals(first.rooms().get(i).mapY(), second.rooms().get(i).mapY());
+            assertEquals(first.rooms().get(i).shape(), second.rooms().get(i).shape());
+            assertEquals(first.rooms().get(i).areas(), second.rooms().get(i).areas());
+            assertEquals(first.rooms().get(i).walls(), second.rooms().get(i).walls());
             if (i > 0) assertFalse(first.rooms().get(i).neighbors().isEmpty());
         }
+        assertTrue(first.entrance().walls().isEmpty(), "初始房间不得生成障碍物");
+        assertTrue(first.rooms().getLast().maxX() - first.rooms().getLast().minX() >= 1000,
+                "Boss 房应明显大于普通房间");
     }
 
     @Test

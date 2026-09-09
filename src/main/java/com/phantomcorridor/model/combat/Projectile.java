@@ -29,9 +29,13 @@ public final class Projectile {
         remainingLifetime -= dt;
     }
 
+    public void expire() { remainingLifetime = 0.0; }
+
     public boolean isExpired() { return remainingLifetime <= 0.0; }
     public double getX() { return x; }
     public double getY() { return y; }
     public double getRadius() { return radius; }
+    public double getVelocityX() { return velocityX; }
+    public double getVelocityY() { return velocityY; }
     public WorldType getWorld() { return world; }
 }

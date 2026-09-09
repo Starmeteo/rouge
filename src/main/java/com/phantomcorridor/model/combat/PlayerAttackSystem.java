@@ -3,6 +3,7 @@ package com.phantomcorridor.model.combat;
 import com.phantomcorridor.config.GameConfig;
 import com.phantomcorridor.model.WorldType;
 import com.phantomcorridor.model.entity.Player;
+import com.phantomcorridor.model.room.RoomNavigationSystem;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -23,10 +24,27 @@ public final class PlayerAttackSystem {
     }
 
     public void update(double dt) {
+        update(dt, null);
+    }
+
+    public void update(double dt, RoomNavigationSystem navigation) {
         cooldownRemaining = Math.max(0.0, cooldownRemaining - dt);
         meleeVisibleRemaining = Math.max(0.0, meleeVisibleRemaining - dt);
-        projectiles.forEach(projectile -> projectile.update(dt));
+        projectiles.forEach(projectile -> {
+            double oldX = projectile.getX();
+            double oldY = projectile.getY();
+            projectile.update(dt);
+            if (navigation != null && (!navigation.canProjectileOccupy(
+                    projectile.getX(), projectile.getY(), projectile.getRadius(), projectile.getWorld())
+                    || !navigation.isSegmentClear(oldX, oldY, projectile.getX(), projectile.getY(),
+                    projectile.getRadius(), projectile.getWorld()))) projectile.expire();
+        });
         projectiles.removeIf(Projectile::isExpired);
+    }
+
+    public void clearTransientAttacks() {
+        projectiles.clear();
+        meleeVisibleRemaining = 0.0;
     }
 
     public boolean tryAttack(Player player, double targetX, double targetY) {

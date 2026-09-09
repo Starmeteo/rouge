@@ -22,6 +22,8 @@ public final class GameSession {
     private double phasePulseVisibleRemaining;
     private double aimX;
     private double aimY;
+    private String roomAnnouncement = "";
+    private double roomAnnouncementRemaining;
     private boolean combatActive;
     private int lightEnemyCount;
     private int shadowEnemyCount;
@@ -35,6 +37,8 @@ public final class GameSession {
         attackSystem.reset();
         enemyProjectiles.reset();
         phasePulseVisibleRemaining = 0.0;
+        roomAnnouncement = "入口房";
+        roomAnnouncementRemaining = 2.2;
         aimX = player.getX() + 1.0;
         aimY = player.getY();
         combatActive = false;
@@ -43,26 +47,41 @@ public final class GameSession {
         coins = 0;
         dungeonSeed = MapGenerator.parseSeed(configuredSeed);
         navigation.reset(new MapGenerator().generate(dungeonSeed));
+        navigation.placeAtEntrance(player);
     }
 
     public void update(double dt, double movementX, double movementY,
                        double targetX, double targetY, boolean attacking) {
         worldShift.update(dt);
-        attackSystem.update(dt);
         phasePulseVisibleRemaining = Math.max(0.0, phasePulseVisibleRemaining - dt);
+        roomAnnouncementRemaining = Math.max(0.0, roomAnnouncementRemaining - Math.max(0.0, dt));
         aimX = targetX;
         aimY = targetY;
         navigation.move(player, movementX, movementY, dt);
+        if (navigation.consumeRoomChanged()) {
+            attackSystem.clearTransientAttacks();
+            roomAnnouncement = roomTypeLabel(navigation.getCurrentRoom().type());
+            roomAnnouncementRemaining = 2.2;
+        }
+        attackSystem.update(dt, navigation);
         if (!combatActive) {
             player.restorePhaseEnergy(GameConfig.PHASE_ENERGY_REGEN_PER_SEC * dt);
         }
         if (attacking) {
             attackSystem.tryAttack(player, aimX, aimY);
         }
+        player.updateAnimation(dt, movementX, movementY, attacking,
+                phasePulseVisibleRemaining > 0.0);
     }
 
     public boolean tryShiftWorld() {
+        WorldType targetWorld = player.getCurrentWorld() == WorldType.LIGHT
+                ? WorldType.SHADOW : WorldType.LIGHT;
+        double[] safePosition = navigation.findNearestSafePosition(
+                player.getX(), player.getY(), targetWorld);
+        if (safePosition == null) return false;
         if (!worldShift.tryShift(player)) return false;
+        player.setPosition(safePosition[0], safePosition[1]);
         if (worldShift.consumePulse()) {
             enemyProjectiles.clearWithin(player.getX(), player.getY(), GameConfig.PHASE_PULSE_RADIUS);
             phasePulseVisibleRemaining = GameConfig.PHASE_PULSE_VISIBLE_TIME;
@@ -82,4 +101,18 @@ public final class GameSession {
     public int getCoins() { return coins; }
     public RoomNavigationSystem getNavigation() { return navigation; }
     public long getDungeonSeed() { return dungeonSeed; }
+    public boolean isRoomAnnouncementVisible() { return roomAnnouncementRemaining > 0.0; }
+    public String getRoomAnnouncement() { return roomAnnouncement; }
+    public double getRoomAnnouncementRemaining() { return roomAnnouncementRemaining; }
+
+    private static String roomTypeLabel(RoomType type) {
+        return switch (type) {
+            case ENTRANCE -> "入口房";
+            case BATTLE -> "战斗房";
+            case REWARD -> "奖励房";
+            case SHOP -> "商店房";
+            case EVENT -> "事件房";
+            case BOSS -> "Boss 房";
+        };
+    }
 }

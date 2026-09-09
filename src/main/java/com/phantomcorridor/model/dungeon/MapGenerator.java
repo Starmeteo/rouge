@@ -28,7 +28,7 @@ public final class MapGenerator {
             int y = parent.mapY() + direction.dy();
             RoomType type = id == RoomConfig.DEFAULT_ROOM_COUNT - 1 ? RoomType.BOSS
                     : RANDOM_TYPES[RandomUtil.weightedIndex(random, WEIGHTS)];
-            Room room = new Room(id, type, x, y);
+            Room room = new Room(id, type, x, y, random.nextLong());
             parent.connect(direction, id);
             room.connect(direction.opposite(), parent.id());
             rooms.add(room);

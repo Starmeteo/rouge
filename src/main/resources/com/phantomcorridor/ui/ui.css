@@ -1,7 +1,7 @@
-/* 双界行者：破碎回廊主题。视觉重点是旧金圣辉、幽紫影域和中央裂隙。 */
+/* 双界行者：像素回廊主题。方角、硬阴影、低色阶与高对比双界配色。 */
 
 .root {
-    -fx-font-family: "Microsoft YaHei UI", "PingFang SC", "Noto Sans CJK SC", sans-serif;
+    -fx-font-family: "Consolas", "Microsoft YaHei UI", "Noto Sans CJK SC", monospace;
     -fx-background-color: #07060b;
 }
 
@@ -11,37 +11,37 @@
 }
 
 .eyebrow {
-    -fx-font-family: "Georgia";
+    -fx-font-family: "Consolas";
     -fx-font-size: 13px;
     -fx-font-weight: bold;
     -fx-text-fill: rgba(226, 202, 157, 0.72);
 }
 
 .login-title {
-    -fx-font-family: "STKaiti", "KaiTi", "Microsoft YaHei UI";
+    -fx-font-family: "Consolas", "Microsoft YaHei UI";
     -fx-font-size: 66px;
     -fx-font-weight: bold;
     -fx-text-fill: linear-gradient(to right, #f4dfae 0%, #d7b364 43%, #ccb9e8 58%, #9868d3 100%);
-    -fx-effect: dropshadow(gaussian, rgba(0, 0, 0, 0.95), 12, 0.58, 0, 4);
+    -fx-effect: dropshadow(one-pass-box, #000000, 0, 1, 5, 5);
 }
 
 .login-subtitle,
 .menu-subtitle {
-    -fx-font-family: "STKaiti", "KaiTi", "Microsoft YaHei UI";
+    -fx-font-family: "Consolas", "Microsoft YaHei UI";
     -fx-font-size: 18px;
     -fx-text-fill: #c5b79e;
 }
 
 .domain-mark {
-    -fx-font-family: "STKaiti", "KaiTi", "Microsoft YaHei UI";
+    -fx-font-family: "Consolas", "Microsoft YaHei UI";
     -fx-font-size: 24px;
     -fx-font-weight: bold;
     -fx-alignment: center;
     -fx-min-width: 58px;
     -fx-min-height: 58px;
-    -fx-background-radius: 50%;
-    -fx-border-radius: 50%;
-    -fx-border-width: 1px;
+    -fx-background-radius: 0;
+    -fx-border-radius: 0;
+    -fx-border-width: 3px;
 }
 
 .domain-mark-light {
@@ -62,13 +62,13 @@
 .menu-panel {
     -fx-background-color: linear-gradient(to bottom right,
         rgba(25, 21, 20, 0.90), rgba(10, 8, 15, 0.92));
-    -fx-background-radius: 5px;
+    -fx-background-radius: 0;
     -fx-border-color: linear-gradient(to right,
         rgba(218, 176, 91, 0.72), rgba(122, 94, 70, 0.35), rgba(132, 80, 190, 0.68));
-    -fx-border-width: 1px;
-    -fx-border-radius: 5px;
+    -fx-border-width: 3px;
+    -fx-border-radius: 0;
     -fx-padding: 48px 62px 48px 62px;
-    -fx-effect: dropshadow(gaussian, rgba(0, 0, 0, 0.78), 38, 0.45, 0, 12);
+    -fx-effect: dropshadow(one-pass-box, rgba(0, 0, 0, 0.92), 0, 1, 10, 10);
 }
 
 .menu-panel {
@@ -81,10 +81,10 @@
     -fx-pref-width: 350px;
     -fx-pref-height: 48px;
     -fx-background-color: rgba(5, 5, 9, 0.76);
-    -fx-background-radius: 3px;
+    -fx-background-radius: 0;
     -fx-border-color: rgba(181, 153, 103, 0.46);
-    -fx-border-width: 1px;
-    -fx-border-radius: 3px;
+    -fx-border-width: 3px;
+    -fx-border-radius: 0;
     -fx-text-fill: #eee6d8;
     -fx-prompt-text-fill: #756d66;
     -fx-padding: 10px 14px;
@@ -102,11 +102,11 @@
 }
 
 .menu-title {
-    -fx-font-family: "STKaiti", "KaiTi", "Microsoft YaHei UI";
+    -fx-font-family: "Consolas", "Microsoft YaHei UI";
     -fx-font-size: 78px;
     -fx-font-weight: bold;
     -fx-text-fill: linear-gradient(to right, #f2d89b 0%, #d8b464 45%, #c1a8e1 58%, #9461cf 100%);
-    -fx-effect: dropshadow(gaussian, rgba(0, 0, 0, 0.94), 14, 0.58, 0, 4);
+    -fx-effect: dropshadow(one-pass-box, #000000, 0, 1, 6, 6);
 }
 
 .menu-divider {
@@ -123,10 +123,10 @@
     -fx-min-width: 330px;
     -fx-min-height: 52px;
     -fx-background-color: rgba(8, 7, 12, 0.76);
-    -fx-background-radius: 3px;
+    -fx-background-radius: 0;
     -fx-border-color: rgba(169, 141, 99, 0.48);
-    -fx-border-width: 1px;
-    -fx-border-radius: 3px;
+    -fx-border-width: 3px;
+    -fx-border-radius: 0;
     -fx-text-fill: #ddd3c4;
     -fx-cursor: hand;
     -fx-padding: 7px 22px;
@@ -137,7 +137,7 @@
     -fx-background-color: linear-gradient(to right, rgba(74, 51, 24, 0.92), rgba(38, 20, 58, 0.94));
     -fx-border-color: linear-gradient(to right, #e8bd68, #9b65dc);
     -fx-text-fill: #fff4df;
-    -fx-effect: dropshadow(gaussian, rgba(171, 122, 211, 0.22), 18, 0.26, 0, 0);
+    -fx-effect: dropshadow(one-pass-box, rgba(171, 122, 211, 0.55), 0, 1, 4, 4);
 }
 
 .menu-button:pressed {
@@ -187,9 +187,9 @@
     -fx-font-size: 14px;
     -fx-text-fill: #edcf8e;
     -fx-background-color: rgba(42, 31, 19, 0.88);
-    -fx-background-radius: 3px;
+    -fx-background-radius: 0;
     -fx-border-color: rgba(221, 177, 91, 0.56);
-    -fx-border-radius: 3px;
+    -fx-border-radius: 0;
     -fx-padding: 6px 14px;
 }
 
@@ -207,12 +207,12 @@
 
 .settings-slider .track {
     -fx-background-color: linear-gradient(to right, #725526, #563475);
-    -fx-background-radius: 2px;
+    -fx-background-radius: 0;
 }
 
 .settings-slider .thumb {
     -fx-background-color: #e8d5ae;
-    -fx-background-radius: 2px;
+    -fx-background-radius: 0;
 }
 
 .pause-pane {
@@ -221,12 +221,12 @@
 
 .pause-card {
     -fx-background-color: rgba(10, 8, 15, 0.90);
-    -fx-background-radius: 5px;
+    -fx-background-radius: 0;
     -fx-border-color: linear-gradient(to right, rgba(232, 189, 104, 0.72), rgba(155, 101, 220, 0.72));
-    -fx-border-radius: 5px;
-    -fx-border-width: 1px;
+    -fx-border-radius: 0;
+    -fx-border-width: 3px;
     -fx-padding: 44px 62px;
-    -fx-effect: dropshadow(gaussian, rgba(0, 0, 0, 0.75), 32, 0.42, 0, 10);
+    -fx-effect: dropshadow(one-pass-box, rgba(0, 0, 0, 0.92), 0, 1, 9, 9);
 }
 
 .world-shift-flash {

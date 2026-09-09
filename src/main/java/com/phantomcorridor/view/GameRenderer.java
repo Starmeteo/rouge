@@ -5,11 +5,19 @@ import com.phantomcorridor.config.GameConfig;
 import com.phantomcorridor.model.GameSession;
 import com.phantomcorridor.model.WorldType;
 import com.phantomcorridor.model.entity.Player;
+import com.phantomcorridor.model.entity.PlayerAnimationState;
 import com.phantomcorridor.model.combat.Projectile;
 import com.phantomcorridor.model.room.Direction;
 import com.phantomcorridor.model.room.Room;
+import com.phantomcorridor.model.room.RoomArea;
 import com.phantomcorridor.model.room.Wall;
 import javafx.scene.canvas.GraphicsContext;
+import javafx.scene.image.Image;
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.List;
+import java.util.Map;
+import java.util.HashMap;
 import javafx.scene.effect.BlendMode;
 import javafx.scene.paint.Color;
 import javafx.scene.paint.CycleMethod;
@@ -25,19 +33,30 @@ public final class GameRenderer {
 
     private static final Color LIGHT_GOLD = Color.web("#e8bd68");
     private static final Color SHADOW_VIOLET = Color.web("#9b65dc");
+    private static final Map<String, Image[]> LIGHT_FRAMES = loadCharacterFrames("white_cyan");
+    private static final Map<String, Image[]> SHADOW_FRAMES = loadCharacterFrames("black_magenta");
+    private static final Image[] LIGHT_BULLETS = loadSeries("white_cyan", "projectiles", "bullet_fly_right", 1);
+    private static final Image[] SHADOW_BULLETS = loadSeries("black_magenta", "projectiles", "bullet_fly_right", 1);
+    private static final Image[] LIGHT_SLASHES = loadSeries("white_cyan", "effects_aligned", "slash_arc_right", 4);
+    private static final Image[] SHADOW_SLASHES = loadSeries("black_magenta", "effects_aligned", "slash_arc_right", 4);
+    private static final Image[] LIGHT_AURA = loadSeries("white_cyan", "effects_aligned", "aura", 3);
+    private static final Image[] SHADOW_AURA = loadSeries("black_magenta", "effects_aligned", "aura", 3);
 
     public void render(GraphicsContext g, GameSession session, double fps) {
+        g.setImageSmoothing(false);
         Player player = session.getPlayer();
         boolean light = player.getCurrentWorld() == WorldType.LIGHT;
         drawFloor(g, light);
         drawRoom(g, session, light);
         drawPhaseWalls(g, session, light);
-        drawAttacks(g, session, light);
         drawPlayer(g, player, light);
+        // 攻击层在角色之后绘制，避免角色把斩击和投射物遮住。
+        drawAttacks(g, session, light);
         drawPhasePulse(g, session, light);
         drawAim(g, session, light);
         drawHud(g, session, fps, light);
         drawMiniMap(g, session, light);
+        drawRoomAnnouncement(g, session);
         drawControls(g, light);
     }
 
@@ -48,23 +67,47 @@ public final class GameRenderer {
         Color color = light ? LIGHT_GOLD : SHADOW_VIOLET;
         g.setStroke(Color.color(color.getRed(), color.getGreen(), color.getBlue(), 0.74));
         g.setLineWidth(4.0);
-        g.strokeOval(player.getX() - radius, player.getY() - radius, radius * 2.0, radius * 2.0);
+        g.strokeRect(player.getX() - radius, player.getY() - radius, radius * 2.0, radius * 2.0);
     }
 
     private void drawAttacks(GraphicsContext g, GameSession session, boolean light) {
+        Player player = session.getPlayer();
         for (Projectile projectile : session.getAttackSystem().getProjectiles()) {
             double radius = projectile.getRadius();
+            Image[] bullets = light ? LIGHT_BULLETS : SHADOW_BULLETS;
+            if (bullets.length > 0) {
+                Image bullet = bullets[0];
+                double size = Math.max(28.0, radius * 7.0);
+                double height = size * bullet.getHeight() / Math.max(1.0, bullet.getWidth());
+                boolean reverse = projectile.getVelocityX() < 0;
+                g.drawImage(bullet, reverse ? projectile.getX() + size / 2.0 : projectile.getX() - size / 2.0,
+                        projectile.getY() - height / 2.0, reverse ? -size : size, height);
+                continue;
+            }
             g.setGlobalBlendMode(BlendMode.ADD);
             g.setFill(Color.rgb(255, 220, 138, 0.30));
-            g.fillOval(projectile.getX() - radius * 2.5, projectile.getY() - radius * 2.5,
+            g.fillRect(projectile.getX() - radius * 2.5, projectile.getY() - radius * 2.5,
                     radius * 5.0, radius * 5.0);
             g.setGlobalBlendMode(BlendMode.SRC_OVER);
             g.setFill(Color.web("#fff2bd"));
-            g.fillOval(projectile.getX() - radius, projectile.getY() - radius,
+            g.fillRect(projectile.getX() - radius, projectile.getY() - radius,
                     radius * 2.0, radius * 2.0);
         }
         if (!light && session.getAttackSystem().isMeleeVisible()) {
-            Player player = session.getPlayer();
+            Image[] slashes = SHADOW_SLASHES;
+            if (slashes.length > 0) {
+                Image slash = slashes[Math.min(slashes.length - 1,
+                        (int) (player.getAnimationTime() * 12.0) % slashes.length)];
+                double size = 160.0;
+                double angle = Math.toDegrees(Math.atan2(session.getAimY() - player.getY(), session.getAimX() - player.getX()));
+                g.save();
+                g.translate(player.getX(), player.getY());
+                g.rotate(angle);
+                g.drawImage(slash, -size / 2.0, -size * 0.5,
+                        size, size * slash.getHeight() / Math.max(1.0, slash.getWidth()));
+                g.restore();
+                return;
+            }
             double angle = Math.toDegrees(session.getAttackSystem().getMeleeAngleRadians());
             double arc = GameConfig.SHADOW_MELEE_ARC_DEGREES;
             double range = GameConfig.SHADOW_MELEE_RANGE;
@@ -76,6 +119,18 @@ public final class GameRenderer {
             g.setLineWidth(2.0);
             g.strokeArc(player.getX() - range, player.getY() - range, range * 2.0, range * 2.0,
                     -angle - arc / 2.0, arc, javafx.scene.shape.ArcType.OPEN);
+        }
+        if (player.getAnimationState() == PlayerAnimationState.SHIFTING) {
+            Image[] aura = light ? LIGHT_AURA : SHADOW_AURA;
+            if (aura.length > 0) {
+                Image frame = aura[Math.min(aura.length - 1,
+                        (int) (player.getAnimationTime() * 10.0) % aura.length)];
+                double size = 180.0;
+                g.setGlobalBlendMode(BlendMode.ADD);
+                g.drawImage(frame, player.getX() - size / 2.0, player.getY() - size * 0.5,
+                        size, size * frame.getHeight() / Math.max(1.0, frame.getWidth()));
+                g.setGlobalBlendMode(BlendMode.SRC_OVER);
+            }
         }
     }
 
@@ -91,141 +146,235 @@ public final class GameRenderer {
         g.setStroke(Color.color(domain.getRed(), domain.getGreen(), domain.getBlue(), 0.48));
         g.setLineWidth(1.0);
         g.strokeLine(player.getX(), player.getY(), cursorX, cursorY);
-        g.strokeOval(cursorX - 5.0, cursorY - 5.0, 10.0, 10.0);
+        g.strokeRect(cursorX - 5.0, cursorY - 5.0, 10.0, 10.0);
     }
 
     private void drawFloor(GraphicsContext g, boolean light) {
-        g.setFill(light
-                ? new LinearGradient(0, 0, 1, 1, true, CycleMethod.NO_CYCLE,
-                    new Stop(0, Color.web("#211c14")), new Stop(0.55, Color.web("#312719")),
-                    new Stop(1, Color.web("#14110e")))
-                : new LinearGradient(0, 0, 1, 1, true, CycleMethod.NO_CYCLE,
-                    new Stop(0, Color.web("#080610")), new Stop(0.55, Color.web("#171022")),
-                    new Stop(1, Color.web("#05040a"))));
+        g.setFill(light ? Color.web("#100f12") : Color.web("#08070d"));
         g.fillRect(0, 0, AppConfig.VIEW_WIDTH, AppConfig.VIEW_HEIGHT);
-
-        Color grid = light ? Color.rgb(224, 188, 111, 0.08) : Color.rgb(157, 105, 219, 0.10);
-        g.setStroke(grid);
-        g.setLineWidth(1.0);
-        for (int x = 48; x < AppConfig.VIEW_WIDTH; x += 64) {
-            g.strokeLine(x, 0, x, AppConfig.VIEW_HEIGHT);
-        }
-        for (int y = 48; y < AppConfig.VIEW_HEIGHT; y += 64) {
-            g.strokeLine(0, y, AppConfig.VIEW_WIDTH, y);
-        }
-
-        g.setFill(new RadialGradient(0, 0, AppConfig.VIEW_WIDTH / 2.0, AppConfig.VIEW_HEIGHT / 2.0,
-                AppConfig.VIEW_WIDTH * 0.7, false, CycleMethod.NO_CYCLE,
-                new Stop(0.38, Color.TRANSPARENT), new Stop(1, Color.rgb(0, 0, 0, 0.68))));
-        g.fillRect(0, 0, AppConfig.VIEW_WIDTH, AppConfig.VIEW_HEIGHT);
-    }
-
-    private void drawRoom(GraphicsContext g, GameSession session, boolean light) {
-        Color border = light ? Color.web("#8d6d35") : Color.web("#4f3277");
-        Color glow = light ? Color.rgb(236, 195, 105, 0.28) : Color.rgb(153, 91, 218, 0.30);
-        g.setStroke(glow);
-        g.setLineWidth(18.0);
-        g.strokeRoundRect(34, 34, AppConfig.VIEW_WIDTH - 68.0, AppConfig.VIEW_HEIGHT - 68.0, 22, 22);
-        g.setStroke(border);
-        g.setLineWidth(4.0);
-        g.strokeRoundRect(34, 34, AppConfig.VIEW_WIDTH - 68.0, AppConfig.VIEW_HEIGHT - 68.0, 22, 22);
-
-        for (Direction direction : Direction.values()) {
-            if (session.getNavigation().getCurrentRoom().hasDoor(direction)) {
-                drawDoor(g, direction, session.getNavigation().getCurrentRoom().isDoorOpen(direction), light);
+        g.setFill(light ? Color.web("#17151a") : Color.web("#0e0b16"));
+        for (int y = 0; y < AppConfig.VIEW_HEIGHT; y += 16) {
+            for (int x = (y / 16 % 2) * 16; x < AppConfig.VIEW_WIDTH; x += 32) {
+                g.fillRect(x, y, 16, 16);
             }
         }
     }
 
-    private void drawDoor(GraphicsContext g, Direction direction, boolean open, boolean light) {
+    private void drawRoom(GraphicsContext g, GameSession session, boolean light) {
+        Room room = session.getNavigation().getCurrentRoom();
+        Color floor = light ? Color.web("#332d25") : Color.web("#231a31");
+        Color tile = light ? Color.web("#3e372c") : Color.web("#2d213e");
+        Color border = light ? Color.web("#c09145") : Color.web("#7a4eb0");
+        for (RoomArea area : room.areas()) {
+            g.setFill(floor);
+            g.fillRect(area.x(), area.y(), area.width(), area.height());
+            g.setFill(tile);
+            for (double y = area.y(); y < area.y() + area.height(); y += 32) {
+                for (double x = area.x() + (((int) ((y - area.y()) / 32)) % 2) * 16;
+                     x < area.x() + area.width(); x += 32) g.fillRect(x, y, 16, 16);
+            }
+            g.setStroke(Color.rgb(0, 0, 0, 0.72));
+            g.setLineWidth(14);
+            g.strokeRect(area.x(), area.y(), area.width(), area.height());
+            g.setStroke(border);
+            g.setLineWidth(4);
+            g.strokeRect(area.x(), area.y(), area.width(), area.height());
+        }
+
+        for (Direction direction : Direction.values()) {
+            if (room.hasDoor(direction)) {
+                drawDoor(g, room, direction, room.isDoorOpen(direction), light);
+            }
+        }
+    }
+
+    private void drawDoor(GraphicsContext g, Room room, Direction direction, boolean open, boolean light) {
         double half = com.phantomcorridor.config.RoomConfig.DOOR_HALF_WIDTH;
-        double cx = AppConfig.VIEW_WIDTH / 2.0;
-        double cy = AppConfig.VIEW_HEIGHT / 2.0;
-        g.setFill(open ? Color.rgb(12, 9, 18, 0.35) : Color.rgb(4, 4, 8, 0.94));
+        double center = room.doorCenter(direction);
+        Color portal = open ? (light ? Color.web("#ffe08a") : Color.web("#bd78ff")) : Color.web("#d84b55");
+        g.setFill(Color.web("#05050a"));
         if (direction == Direction.NORTH || direction == Direction.SOUTH) {
-            g.fillRect(cx - half, direction == Direction.NORTH ? 24 : AppConfig.VIEW_HEIGHT - 52,
-                    half * 2.0, 28);
+            double y = direction == Direction.NORTH ? room.minY() - 9 : room.maxY() - 9;
+            g.fillRect(center - half, y, half * 2, 18);
+            g.setFill(portal);
+            for (double x = center - half + 6; x < center + half - 6; x += 16) g.fillRect(x, y + 5, 10, 8);
+            g.fillRect(center - 5, y + (direction == Direction.NORTH ? 18 : -10), 10, 10);
         } else {
-            g.fillRect(direction == Direction.WEST ? 24 : AppConfig.VIEW_WIDTH - 52,
-                    cy - half, 28, half * 2.0);
+            double x = direction == Direction.WEST ? room.minX() - 9 : room.maxX() - 9;
+            g.fillRect(x, center - half, 18, half * 2);
+            g.setFill(portal);
+            for (double y = center - half + 6; y < center + half - 6; y += 16) g.fillRect(x + 5, y, 8, 10);
+            g.fillRect(x + (direction == Direction.WEST ? 18 : -10), center - 5, 10, 10);
         }
     }
 
     private void drawPhaseWalls(GraphicsContext g, GameSession session, boolean light) {
         for (Wall wall : session.getNavigation().getCurrentRoom().walls()) {
             boolean active = wall.activeIn(session.getPlayer().getCurrentWorld());
-            Color color = wall.world() == WorldType.LIGHT ? LIGHT_GOLD : SHADOW_VIOLET;
-            drawPhaseWall(g, wall.x(), wall.y(), wall.width(), wall.height(), color, active ? 0.62 : 0.15);
+            Color color = wall.world() == null ? Color.web("#85808a")
+                    : wall.world() == WorldType.LIGHT ? LIGHT_GOLD : SHADOW_VIOLET;
+            drawPhaseWall(g, wall.x(), wall.y(), wall.width(), wall.height(), color, active ? 0.86 : 0.18);
         }
     }
 
     private void drawMiniMap(GraphicsContext g, GameSession session, boolean light) {
         Room current = session.getNavigation().getCurrentRoom();
-        double originX = AppConfig.VIEW_WIDTH - 210.0;
-        double originY = 205.0;
-        double scale = 24.0;
-        g.setStroke(Color.rgb(220, 210, 225, 0.20));
+        double panelX = AppConfig.VIEW_WIDTH - 274.0;
+        double panelY = 205.0;
+        double panelSize = 238.0;
+        double originX = panelX + panelSize / 2.0;
+        double originY = panelY + panelSize / 2.0;
+        double scale = 25.0;
+        g.save();
+        g.beginPath(); g.rect(panelX, panelY, panelSize, panelSize); g.closePath(); g.clip();
+        g.setFill(Color.rgb(3, 3, 7, 0.88));
+        g.fillRect(panelX, panelY, panelSize, panelSize);
+        g.setStroke(light ? Color.web("#76572d") : Color.web("#533478"));
+        g.setLineWidth(3); g.strokeRect(panelX, panelY, panelSize, panelSize);
+        g.setStroke(Color.rgb(220, 210, 225, 0.28));
         g.setLineWidth(2.0);
         for (Room room : session.getNavigation().getMap().rooms()) {
+            if (!room.isDiscovered()) continue;
             for (var edge : room.neighbors().entrySet()) {
                 Room neighbor = session.getNavigation().getMap().room(edge.getValue());
-                g.strokeLine(originX + room.mapX() * scale, originY + room.mapY() * scale,
-                        originX + neighbor.mapX() * scale, originY + neighbor.mapY() * scale);
+                if (!neighbor.isDiscovered() || room.id() > neighbor.id()) continue;
+                g.strokeLine(originX + (room.mapX() - current.mapX()) * scale,
+                        originY + (room.mapY() - current.mapY()) * scale,
+                        originX + (neighbor.mapX() - current.mapX()) * scale,
+                        originY + (neighbor.mapY() - current.mapY()) * scale);
             }
         }
         for (Room room : session.getNavigation().getMap().rooms()) {
-            double x = originX + room.mapX() * scale;
-            double y = originY + room.mapY() * scale;
-            g.setFill(room == current ? (light ? LIGHT_GOLD : SHADOW_VIOLET)
-                    : room.type() == com.phantomcorridor.model.RoomType.BOSS
-                    ? Color.web("#b84e55") : Color.rgb(210, 200, 220, 0.46));
-            g.fillRect(x - 5, y - 5, 10, 10);
+            if (!room.isDiscovered()) continue;
+            double x = originX + (room.mapX() - current.mapX()) * scale;
+            double y = originY + (room.mapY() - current.mapY()) * scale;
+            if (room == current) {
+                g.setFill(light ? Color.web("#fff0a8") : Color.web("#d5a0ff"));
+                g.fillRect(x - 7, y - 7, 14, 14);
+                g.setFill(Color.web("#ffffff"));
+                g.fillRect(x - 2, y - 2, 4, 4);
+            } else if (room.isVisited()) {
+                g.setFill(room.type() == com.phantomcorridor.model.RoomType.BOSS
+                        ? Color.web("#c54e58") : Color.web("#8e8995"));
+                g.fillRect(x - 5, y - 5, 10, 10);
+            } else {
+                g.setStroke(room.type() == com.phantomcorridor.model.RoomType.BOSS
+                        ? Color.web("#d94b5b") : Color.web("#77717f"));
+                g.setLineWidth(2);
+                g.strokeRect(x - 5, y - 5, 10, 10);
+            }
         }
-        g.setFill(Color.rgb(235, 226, 242, 0.62));
-        g.setFont(Font.font("Microsoft YaHei UI", 12));
-        g.fillText("房间 " + (current.id() + 1) + " · " + current.type() + " · 种子 "
-                + session.getDungeonSeed(), originX - 78, originY - 28);
+        g.restore();
+        g.setFill(Color.rgb(235, 226, 242, 0.76));
+        g.setFont(Font.font("Consolas", FontWeight.BOLD, 12));
+        g.fillText("探索地图", panelX + 12, panelY + panelSize + 18);
     }
 
     private void drawPhaseWall(GraphicsContext g, double x, double y, double width, double height,
                                Color color, double alpha) {
-        g.setFill(Color.color(color.getRed(), color.getGreen(), color.getBlue(), alpha * 0.32));
-        g.fillRoundRect(x - 8, y, width + 16, height, 12, 12);
-        g.setStroke(Color.color(color.getRed(), color.getGreen(), color.getBlue(), alpha));
-        g.setLineWidth(2.0);
-        for (double lineY = y + 8; lineY < y + height; lineY += 20) {
-            g.strokeLine(x, lineY, x + width, lineY + 12);
+        g.setFill(Color.color(color.getRed(), color.getGreen(), color.getBlue(), alpha * 0.66));
+        g.fillRect(x, y, width, height);
+        g.setFill(Color.color(0.05, 0.04, 0.08, alpha));
+        for (double py = y + 4; py < y + height; py += 16) {
+            for (double px = x + 4; px < x + width; px += 16) g.fillRect(px, py, 7, 7);
         }
     }
 
     private void drawPlayer(GraphicsContext g, Player player, boolean light) {
+        if (!(light ? LIGHT_FRAMES : SHADOW_FRAMES).isEmpty()) {
+            drawSpritePlayer(g, player, light);
+            return;
+        }
         Color domain = light ? LIGHT_GOLD : SHADOW_VIOLET;
-        double x = player.getX();
-        double y = player.getY();
-        double aura = GameConfig.PLAYER_RADIUS * 3.2;
+        double x = Math.rint(player.getX());
+        double y = Math.rint(player.getY());
+        PlayerAnimationState state = player.getAnimationState();
+        int frame = (int) (player.getAnimationTime() * 8) & 1;
+        if (state == PlayerAnimationState.DOWN) {
+            g.setFill(Color.web("#17131d")); g.fillRect(x - 19, y + 4, 38, 10);
+            g.setFill(domain); g.fillRect(x - 15, y, 24, 8);
+            g.setFill(light ? Color.web("#f4e5bd") : Color.web("#cbb0e8")); g.fillRect(x + 9, y + 2, 9, 9);
+            return;
+        }
+        double bob = state == PlayerAnimationState.MOVING && frame == 1 ? -3 : 0;
+        if (state == PlayerAnimationState.SHIFTING && frame == 1) {
+            g.setFill(Color.rgb(255, 255, 255, 0.34)); g.fillRect(x - 24, y - 28, 48, 52);
+        }
+        g.setFill(Color.rgb(0, 0, 0, 0.55)); g.fillRect(x - 14, y + 14, 28, 7);
+        g.setFill(Color.web("#15121a")); g.fillRect(x - 13, y - 15 + bob, 26, 28);
+        g.setFill(domain); g.fillRect(x - 10, y - 18 + bob, 20, 7);
+        g.fillRect(x - 14, y - 8 + bob, 5, 17); g.fillRect(x + 9, y - 8 + bob, 5, 17);
+        g.setFill(light ? Color.web("#f4e5bd") : Color.web("#cbb0e8"));
+        g.fillRect(x - 7, y - 10 + bob, 14, 12);
+        g.setFill(Color.web("#18121d")); g.fillRect(x - 4, y - 6 + bob, 3, 3); g.fillRect(x + 3, y - 6 + bob, 3, 3);
+        g.setFill(domain);
+        double legOffset = state == PlayerAnimationState.MOVING ? (frame == 0 ? 4 : -4) : 0;
+        g.fillRect(x - 10 + legOffset, y + 11 + bob, 7, 10);
+        g.fillRect(x + 3 - legOffset, y + 11 + bob, 7, 10);
+        if (state == PlayerAnimationState.ATTACKING) {
+            int fx = player.getFacingX() >= 0 ? 1 : -1;
+            g.setFill(light ? Color.web("#fff2a3") : Color.web("#d398ff"));
+            g.fillRect(x + fx * 14 - (fx < 0 ? 12 : 0), y - 3, 12, 7);
+        }
+    }
 
-        g.setGlobalBlendMode(BlendMode.ADD);
-        g.setFill(new RadialGradient(0, 0, x, y, aura, false, CycleMethod.NO_CYCLE,
-                new Stop(0, Color.color(domain.getRed(), domain.getGreen(), domain.getBlue(), 0.48)),
-                new Stop(1, Color.TRANSPARENT)));
-        g.fillOval(x - aura, y - aura, aura * 2, aura * 2);
-        g.setGlobalBlendMode(BlendMode.SRC_OVER);
+    private void drawSpritePlayer(GraphicsContext g, Player player, boolean light) {
+        Map<String, Image[]> all = light ? LIGHT_FRAMES : SHADOW_FRAMES;
+        String direction = player.getFacingY() < -0.35 ? "back" : player.getFacingY() > 0.35 ? "front"
+                : player.getFacingX() < 0 ? "left" : "right";
+        boolean mirror = direction.equals("left");
+        String assetDirection = mirror ? "right" : direction;
+        String action = switch (player.getAnimationState()) {
+            case ATTACKING -> "slash_" + (assetDirection.equals("right") ? "right" : "recover_front");
+            case SHIFTING -> "cast_right";
+            case DOWN -> "down_" + assetDirection;
+            case MOVING -> "move_" + assetDirection;
+            default -> "idle_" + assetDirection;
+        };
+        Image[] frames = all.getOrDefault(action, all.getOrDefault("idle_front", new Image[0]));
+        if (frames.length == 0) return;
+        int frame = (player.getAnimationState() == PlayerAnimationState.IDLE
+                || player.getAnimationState() == PlayerAnimationState.DOWN) ? 0
+                : Math.min(frames.length - 1, (int) (player.getAnimationTime() * 10.0) % frames.length);
+        Image sprite = frames[frame];
+        double drawW = 160.0;
+        double drawH = drawW * sprite.getHeight() / Math.max(1.0, sprite.getWidth());
+        double left = Math.rint(player.getX() - drawW / 2);
+        // v2 资源的视觉锚点落在胸口附近，而不是画布顶部或脚底。
+        double top = Math.rint(player.getY() - drawH * 0.58);
+        g.drawImage(sprite, mirror ? left + drawW : left, top, mirror ? -drawW : drawW, drawH);
+    }
 
-        g.setFill(light ? Color.web("#f8edd5") : Color.web("#c9b4e5"));
-        g.fillOval(x - GameConfig.PLAYER_RADIUS, y - GameConfig.PLAYER_RADIUS,
-                GameConfig.PLAYER_RADIUS * 2, GameConfig.PLAYER_RADIUS * 2);
-        g.setStroke(domain);
-        g.setLineWidth(3.0);
-        g.strokeOval(x - GameConfig.PLAYER_RADIUS, y - GameConfig.PLAYER_RADIUS,
-                GameConfig.PLAYER_RADIUS * 2, GameConfig.PLAYER_RADIUS * 2);
+    private void drawRoomAnnouncement(GraphicsContext g, GameSession session) {
+        if (!session.isRoomAnnouncementVisible()) return;
+        double remaining = session.getRoomAnnouncementRemaining();
+        double alpha = remaining < 0.35 ? Math.max(0.0, remaining / 0.35) : 1.0;
+        g.setTextAlign(TextAlignment.CENTER);
+        g.setFont(Font.font("Consolas", FontWeight.BOLD, 24));
+        g.setFill(Color.rgb(255, 239, 178, alpha));
+        g.fillText("◆  " + session.getRoomAnnouncement() + "  ◆", AppConfig.VIEW_WIDTH / 2.0, 84);
+        g.setTextAlign(TextAlignment.LEFT);
+    }
 
-        g.setStroke(domain);
-        g.setLineWidth(1.4);
-        g.strokeOval(x - 25, y - 25, 50, 50);
-        g.strokeLine(x - 31, y, x - 21, y);
-        g.strokeLine(x + 21, y, x + 31, y);
-        g.strokeLine(x, y - 31, x, y - 21);
-        g.strokeLine(x, y + 21, x, y + 31);
+    private static Map<String, Image[]> loadCharacterFrames(String palette) {
+        Map<String, Image[]> result = new HashMap<>();
+        String[][] specs = {
+                {"idle_front", "2"}, {"idle_back", "1"}, {"idle_right", "1"},
+                {"move_front", "2"}, {"move_back", "2"}, {"move_right", "4"},
+                {"cast_right", "6"}, {"slash_right", "5"}, {"slash_recover_front", "6"},
+                {"down_front", "1"}, {"down_back", "1"}, {"down_right", "2"}
+        };
+        for (String[] spec : specs) result.put(spec[0], loadSeries(palette, "characters", spec[0], Integer.parseInt(spec[1])));
+        return result;
+    }
+
+    private static Image[] loadSeries(String palette, String folder, String prefix, int count) {
+        List<Image> frames = new ArrayList<>();
+        for (int i = 1; i <= count; i++) {
+            var resource = GameRenderer.class.getResource("/com/phantomcorridor/sprites/v2/" + palette + "/" + folder + "/" + prefix + "_" + String.format("%02d", i) + ".png");
+            if (resource != null) frames.add(new Image(resource.toExternalForm(), false));
+        }
+        return frames.toArray(Image[]::new);
     }
 
     private void drawHud(GraphicsContext g, GameSession session, double fps, boolean light) {
