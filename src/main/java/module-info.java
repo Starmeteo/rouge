@@ -1,15 +1,14 @@
 /**
- * 《幻境回廊》模块信息。
+ * 《双界行者》模块信息。
  *
- * <p>游戏画面使用 Canvas 代码绘制（见 {@code core.GameLoop} 与 {@code ui.GamePane}），
- * 模块仅依赖 javafx.controls（其透传 javafx.graphics / javafx.base）。
- * 未导出包（model / generator / ai / collision）为模块内部实现，
- * 仅导出对外可见的启动入口与核心运行支持、界面层。
+ * <p>游戏画面使用 Canvas 代码绘制（见 {@code core.GameLoop} 与 {@code view.GameView}），
+ * 模块仅依赖 javafx.controls（其透传 javafx.graphics / javafx.base），不使用 FXML（已于重构移除）。
+ * 导出根包（启动入口与主类）与 core 包；model / util / config 等内部实现包不对外导出。
  */
-module org.example.rouge {
+module com.phantomcorridor {
     requires javafx.controls;
+    requires java.prefs;
 
-    exports org.example.rouge;
-    exports org.example.rouge.core;
-    exports org.example.rouge.ui;
+    exports com.phantomcorridor;
+    exports com.phantomcorridor.core;
 }
