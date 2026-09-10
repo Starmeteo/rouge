@@ -144,6 +144,11 @@ public final class GameSession {
         return roomContent.prompt(navigation.getCurrentRoom(), player);
     }
 
+    /** 当前交互目标（地面拾取物）；渲染层用它给最近的那件物品画名称标签。 */
+    public Pickup getInteractionTarget() {
+        return roomContent.currentTarget(navigation.getCurrentRoom(), player);
+    }
+
     /** 商店商品的售价（金币）；当前房间不是商店或物品不可售时返回 -1。 */
     public int getShopPrice(Pickup pickup) {
         return navigation.getCurrentRoom().type() == RoomType.SHOP

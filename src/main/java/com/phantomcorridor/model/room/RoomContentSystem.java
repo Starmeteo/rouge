@@ -100,12 +100,25 @@ public final class RoomContentSystem {
         if (target == null) return "";
         int price = room.type() == RoomType.SHOP ? priceOf(target) : -1;
         if (price >= 0) {
-            if (target != selectedOffer) return "E  购买 " + price + " 金币";
+            if (target != selectedOffer) return "E  购买 " + target.displayName() + " " + price + " 金币";
             return player.getCoins() >= price
                     ? "E  确认购买 " + price + " 金币（走开取消）"
                     : "金币不足：需 " + price + "，当前 " + player.getCoins();
         }
-        return target.type() == Pickup.Type.EQUIPMENT ? "E  装备" : "E  拾取";
+        return target.type() == Pickup.Type.EQUIPMENT
+                ? "E  装备 " + target.displayName()
+                : "E  拾取 " + target.displayName();
+    }
+
+    /**
+     * 当前交互目标（地面上离玩家最近、且在交互范围内的拾取物）；宝箱或事件是目标时返回 null。
+     *
+     * <p>提示文本与地面名称标签都取自这里，保证两处判断永远一致。
+     */
+    public Pickup currentTarget(Room room, Player player) {
+        if (room.type() == RoomType.EVENT && room.loot().isEventPending()) return null;
+        if (room.hasUnopenedChest() && nearChest(room, player)) return null;
+        return nearestPickup(room, player);
     }
 
     /** 商品售价（金币）；不是可售装备时返回 -1。 */

@@ -34,7 +34,14 @@ public final class GameConfig {
     public static final double SHADOW_MELEE_ARC_DEGREES = 330.0;
     public static final double SHADOW_MELEE_VISIBLE_TIME = 0.13;
     public static final double SHADOW_ATTACK_COOLDOWN = 0.55;
-    public static final int ATTACK_CHARGE_MAX = 5;
+    /**
+     * 攻击充能（蓝条）上限：决定一段连射能打多少发，充能耗尽后按
+     * {@link #ATTACK_CHARGE_RECOVERY_TIME} 逐发回复。
+     *
+     * <p>原先只有 5 发，房间里的敌人变多、又会整房索敌之后明显不够用，
+     * 这里放宽到 10 发；后续道具（通用/双界）会在此之上再加容量。
+     */
+    public static final int ATTACK_CHARGE_MAX = 10;
     public static final int LIGHT_ATTACK_CHARGE_COST = 1;
     public static final int SHADOW_ATTACK_CHARGE_COST = 1;
     public static final double ATTACK_CHARGE_RECOVERY_TIME = 1.35;

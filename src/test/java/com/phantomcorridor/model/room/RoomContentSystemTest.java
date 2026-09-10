@@ -81,7 +81,7 @@ class RoomContentSystemTest {
 
         // 再走回来是重新“购买”，而不是直接停在确认。
         player.setPosition(offer.x(), offer.y());
-        assertEquals("E  购买 " + price + " 金币", content.prompt(shop, player));
+        assertEquals("E  购买 " + offer.displayName() + " " + price + " 金币", content.prompt(shop, player));
         content.interact(shop, player);
         assertTrue(content.isOfferSelected(offer));
         assertEquals(price, player.getCoins(), "选中不算购买");
@@ -160,6 +160,57 @@ class RoomContentSystemTest {
         battle.setCleared(true);
         assertTrue(battle.isDefeatedBattleRoom());
         assertFalse(openRoom(5, RoomType.REWARD).isDefeatedBattleRoom(), "奖励房不进“已清空”提示");
+    }
+
+    @Test
+    void pickupsAreNamedAndHealthPacksReadAsPotions() {
+        assertEquals("生命恢复药剂", new Pickup(Pickup.Type.HEALTH, 0, 0, 2).displayName());
+        assertEquals("金币", new Pickup(Pickup.Type.COIN, 0, 0, 5).displayName());
+        assertEquals("相位碎片", new Pickup(Pickup.Type.PHASE_FRAGMENT, 0, 0, 2).displayName());
+        Pickup weapon = new Pickup(Pickup.Type.EQUIPMENT, 0, 0, 0);
+        assertEquals(EquipmentType.values()[0].displayName(), weapon.displayName());
+    }
+
+    @Test
+    void interactionPromptAndTargetNameThePickup() {
+        Room room = openRoom(2, RoomType.REWARD);
+        Player player = new Player(600, 480);
+        RoomContentSystem content = new RoomContentSystem();
+        content.reset(5L);
+        room.loot().addPickup(new Pickup(Pickup.Type.HEALTH, 610, 480, 2));
+
+        assertEquals("E  拾取 生命恢复药剂", content.prompt(room, player));
+        assertEquals(new Pickup(Pickup.Type.HEALTH, 610, 480, 2), content.currentTarget(room, player));
+
+        // 走出交互半径：提示与名称标签目标一起消失。
+        player.setPosition(900, 480);
+        assertEquals("", content.prompt(room, player));
+        assertNull(content.currentTarget(room, player));
+    }
+
+    @Test
+    void equipmentPromptShowsTheItemName() {
+        Room room = openRoom(2, RoomType.REWARD);
+        Player player = new Player(600, 480);
+        RoomContentSystem content = new RoomContentSystem();
+        content.reset(5L);
+        Pickup equipment = new Pickup(Pickup.Type.EQUIPMENT, 610, 480, 1);
+        room.loot().addPickup(equipment);
+
+        assertEquals("E  装备 " + equipment.displayName(), content.prompt(room, player));
+    }
+
+    @Test
+    void shopPromptShowsTheItemNameAndPrice() {
+        Room shop = openRoom(3, RoomType.SHOP);
+        Player player = new Player(640, 480);
+        RoomContentSystem content = new RoomContentSystem();
+        content.reset(42L);
+        content.enterRoom(shop, player);
+        Pickup offer = nearestOffer(shop, player);
+        int price = RoomContentSystem.priceOf(offer);
+
+        assertEquals("E  购买 " + offer.displayName() + " " + price + " 金币", content.prompt(shop, player));
     }
 
     /** 把玩家放到离某件商品最近的位置，避免测试依赖商店的摆放顺序。 */
