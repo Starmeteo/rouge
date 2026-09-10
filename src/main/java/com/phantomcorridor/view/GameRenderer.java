@@ -12,7 +12,9 @@ import com.phantomcorridor.model.entity.PlayerAnimationState;
 import com.phantomcorridor.model.combat.Projectile;
 import com.phantomcorridor.model.combat.EnemyAttack;
 import com.phantomcorridor.model.combat.EnemyVisualEffect;
-import com.phantomcorridor.model.combat.EnemyProjectile;
+// 未使用（IDE 的 Unused import 会报）：唯一用到它的 drawEnemyProjectiles 已注释（见文件下方），
+// 敌方弹体现在由 drawEnemyAttacks 统一绘制。恢复那个方法时把这行一起放开即可。
+// import com.phantomcorridor.model.combat.EnemyProjectile;
 import com.phantomcorridor.model.combat.SummonRift;
 import com.phantomcorridor.model.entity.Enemy;
 import com.phantomcorridor.model.entity.EnemyKind;
@@ -54,7 +56,9 @@ public final class GameRenderer {
     private static final Map<String, Image[]> SHADOW_FRAMES = loadCharacterFrames("black_magenta");
     private static final Image[] LIGHT_BULLETS = loadSeries("white_cyan", "projectiles", "bullet_fly_right", 1);
     private static final Image[] SHADOW_BULLETS = loadSeries("black_magenta", "projectiles", "bullet_fly_right", 1);
-    private static final Image[] LIGHT_SLASHES = loadSeries("white_cyan", "effects_aligned", "slash_arc_right", 4);
+    // 未被引用（IDE 的 Unused 检查会报）：斩击素材只有影界近战在用（见 SHADOW_SLASHES），
+    // 光界走弹体，因此这份光界斩击帧既不会被绘制、也不会被加载。暂时注释保留。
+    // private static final Image[] LIGHT_SLASHES = loadSeries("white_cyan", "effects_aligned", "slash_arc_right", 4);
     private static final Image[] SHADOW_SLASHES = loadSeries("black_magenta", "effects_aligned", "slash_arc_right", 4);
     private static final Image[] LIGHT_AURA = loadSeries("white_cyan", "effects_aligned", "aura", 3);
     private static final Image[] SHADOW_AURA = loadSeries("black_magenta", "effects_aligned", "aura", 3);
@@ -70,7 +74,7 @@ public final class GameRenderer {
         boolean light = player.getCurrentWorld() == WorldType.LIGHT;
         drawFloor(g, light);
         drawRoom(g, session, light);
-        drawPhaseWalls(g, session, light);
+        drawPhaseWalls(g, session);
         drawBlinkFlash(g, session);
         drawSummonRifts(g, session, player.getCurrentWorld());
         drawEnemies(g, session, player.getCurrentWorld());
@@ -284,18 +288,20 @@ public final class GameRenderer {
         }
     }
 
-    private static String enemyEffect(EnemyKind kind, WorldType world) {
-        boolean light = world == WorldType.LIGHT;
-        return switch (kind) {
-            case LANTERN -> light ? "seeker_orb" : "dusk_needle";
-            case WOLF -> light ? "bite_flash" : "bite_arc";
-            case GOLEM -> light ? "ground_crack" : "slam_sector";
-            case MAGE -> light ? "fan_pellet" : "mirror_arc";
-            case EXECUTIONER -> light ? "spear_projectile" : "cleave_arc";
-            case BELL -> light ? "bell_pellet" : "annular_burst";
-            case WATCHER -> light ? "rift_spear" : "slash_arc";
-        };
-    }
+    // 未被引用（IDE 的 Unused 检查会报）：攻击特效 id 现在已经直接挂在 EnemyAttack 上
+    // （见 EnemySkill.effect），渲染时不必再按物种 + 世界反推一次。暂时注释保留。
+    // private static String enemyEffect(EnemyKind kind, WorldType world) {
+    //     boolean light = world == WorldType.LIGHT;
+    //     return switch (kind) {
+    //         case LANTERN -> light ? "seeker_orb" : "dusk_needle";
+    //         case WOLF -> light ? "bite_flash" : "bite_arc";
+    //         case GOLEM -> light ? "ground_crack" : "slam_sector";
+    //         case MAGE -> light ? "fan_pellet" : "mirror_arc";
+    //         case EXECUTIONER -> light ? "spear_projectile" : "cleave_arc";
+    //         case BELL -> light ? "bell_pellet" : "annular_burst";
+    //         case WATCHER -> light ? "rift_spear" : "slash_arc";
+    //     };
+    // }
 
     private static Image monsterImage(String relativePath) {
         if (MONSTER_IMAGES.containsKey(relativePath)) return MONSTER_IMAGES.get(relativePath);
@@ -369,43 +375,47 @@ public final class GameRenderer {
         }
     }
 
-    private void drawEnemyProjectiles(GraphicsContext g, GameSession session, boolean light) {
-        for (EnemyProjectile p : session.getEnemyProjectiles().getProjectiles()) {
-            if ((p.getWorld() == WorldType.LIGHT) != light) continue;
-            double r = p.getRadius();
-            g.setGlobalBlendMode(BlendMode.ADD);
-            g.setFill(light ? Color.rgb(255, 231, 151, .75) : Color.rgb(218, 105, 255, .78));
-            g.fillRect(p.getX() - r, p.getY() - r, r * 2, r * 2);
-            g.setGlobalBlendMode(BlendMode.SRC_OVER);
-        }
-    }
-
-    private void drawEnemies(GraphicsContext g, GameSession session, boolean light) {
-        for (Enemy enemy : session.getEnemies().getEnemies()) {
-            if ((enemy.getWorld() == WorldType.LIGHT) != light) continue;
-            String action = enemy.getAlertRemaining() > 0.0 ? "attack_windup" : "idle";
-            String direction = "front";
-            var resource = getClass().getResource("/com/phantomcorridor/enemies/atlases/" + enemy.getKind().assetId()
-                    + "/" + (light ? "light" : "shadow") + "/body/" + action + "/" + direction + ".png");
-            if (resource == null) resource = getClass().getResource("/com/phantomcorridor/enemies/atlases/" + enemy.getKind().assetId()
-                    + "/" + (light ? "light" : "shadow") + "/body/idle/front.png");
-            if (resource == null) continue;
-            Image atlas = new Image(resource.toExternalForm(), false);
-            double frameW = atlas.getWidth() / 4.0;
-            int frame = 0;
-            double size = enemy.isBoss() ? 260 : enemy.getKind().elite() ? 180 : 132;
-            double h = size * atlas.getHeight() / Math.max(1.0, atlas.getWidth() / 4.0);
-            g.drawImage(atlas, frame * frameW, 0, frameW, atlas.getHeight(),
-                        enemy.getX() - size / 2.0, enemy.getY() - h * .875, size, h);
-            g.setFill(Color.rgb(20, 10, 18, .8)); g.fillRect(enemy.getX() - 28, enemy.getY() - h * .95, 56, 5);
-            g.setFill(light ? Color.web("#f1c56e") : Color.web("#d783ff"));
-            g.fillRect(enemy.getX() - 28, enemy.getY() - h * .95, 56.0 * enemy.getHp() / enemy.getMaxHp(), 5);
-            if (enemy.getAlertRemaining() > 0.0) {
-                g.setStroke(light ? Color.web("#ffe89a") : Color.web("#ed8cff"));
-                g.setLineWidth(3); g.strokeOval(enemy.getX() - 28, enemy.getY() - 28, 56, 56);
-            }
-        }
-    }
+    // 以下两个方法当前没有任何调用点（IDE 的 Unused 检查会报）：敌人与敌方弹体都改由
+    // drawEnemies(WorldType) / drawEnemyAttacks(WorldType) 绘制——同界过滤用世界枚举而不是布尔值，
+    // 免得“非当前世界的敌人不绘制”这条规则被两个重载各写一遍。暂时整体注释保留。
+    //
+    // private void drawEnemyProjectiles(GraphicsContext g, GameSession session, boolean light) {
+    //     for (EnemyProjectile p : session.getEnemyProjectiles().getProjectiles()) {
+    //         if ((p.getWorld() == WorldType.LIGHT) != light) continue;
+    //         double r = p.getRadius();
+    //         g.setGlobalBlendMode(BlendMode.ADD);
+    //         g.setFill(light ? Color.rgb(255, 231, 151, .75) : Color.rgb(218, 105, 255, .78));
+    //         g.fillRect(p.getX() - r, p.getY() - r, r * 2, r * 2);
+    //         g.setGlobalBlendMode(BlendMode.SRC_OVER);
+    //     }
+    // }
+    //
+    // private void drawEnemies(GraphicsContext g, GameSession session, boolean light) {
+    //     for (Enemy enemy : session.getEnemies().getEnemies()) {
+    //         if ((enemy.getWorld() == WorldType.LIGHT) != light) continue;
+    //         String action = enemy.getAlertRemaining() > 0.0 ? "attack_windup" : "idle";
+    //         String direction = "front";
+    //         var resource = getClass().getResource("/com/phantomcorridor/enemies/atlases/" + enemy.getKind().assetId()
+    //                 + "/" + (light ? "light" : "shadow") + "/body/" + action + "/" + direction + ".png");
+    //         if (resource == null) resource = getClass().getResource("/com/phantomcorridor/enemies/atlases/" + enemy.getKind().assetId()
+    //                 + "/" + (light ? "light" : "shadow") + "/body/idle/front.png");
+    //         if (resource == null) continue;
+    //         Image atlas = new Image(resource.toExternalForm(), false);
+    //         double frameW = atlas.getWidth() / 4.0;
+    //         int frame = 0;
+    //         double size = enemy.isBoss() ? 260 : enemy.getKind().elite() ? 180 : 132;
+    //         double h = size * atlas.getHeight() / Math.max(1.0, atlas.getWidth() / 4.0);
+    //         g.drawImage(atlas, frame * frameW, 0, frameW, atlas.getHeight(),
+    //                     enemy.getX() - size / 2.0, enemy.getY() - h * .875, size, h);
+    //         g.setFill(Color.rgb(20, 10, 18, .8)); g.fillRect(enemy.getX() - 28, enemy.getY() - h * .95, 56, 5);
+    //         g.setFill(light ? Color.web("#f1c56e") : Color.web("#d783ff"));
+    //         g.fillRect(enemy.getX() - 28, enemy.getY() - h * .95, 56.0 * enemy.getHp() / enemy.getMaxHp(), 5);
+    //         if (enemy.getAlertRemaining() > 0.0) {
+    //             g.setStroke(light ? Color.web("#ffe89a") : Color.web("#ed8cff"));
+    //             g.setLineWidth(3); g.strokeOval(enemy.getX() - 28, enemy.getY() - 28, 56, 56);
+    //         }
+    //     }
+    // }
 
     private void drawPickups(GraphicsContext g, GameSession session) {
         for (var pickup : session.getPickups()) {
@@ -749,7 +759,14 @@ public final class GameRenderer {
         }
     }
 
-    private void drawPhaseWalls(GraphicsContext g, GameSession session, boolean light) {
+    /**
+     * 相位墙：两界共有墙画成灰色，光/影专属墙按所属世界着色。
+     *
+     * <p>参数 {@code light} 已经不需要了——判断某面墙当前是否生效用的是
+     * {@code session.getPlayer().getCurrentWorld()}，多传一个布尔值反而容易让人以为
+     * 可以画“另一个世界”的墙。按注释保留旧签名备查。
+     */
+    private void drawPhaseWalls(GraphicsContext g, GameSession session /*, boolean light */) {
         for (Wall wall : session.getNavigation().getCurrentRoom().walls()) {
             boolean active = wall.activeIn(session.getPlayer().getCurrentWorld());
             Color color = wall.world() == null ? Color.web("#85808a")

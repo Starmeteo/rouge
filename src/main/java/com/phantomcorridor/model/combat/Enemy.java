@@ -17,7 +17,7 @@ public final class Enemy {
         stateTime += dt; attackCooldown = Math.max(0, attackCooldown - dt);
         double dx=player.getX()-x, dy=player.getY()-y, distance=Math.hypot(dx,dy);
         if (distance > 0.01) { facingX=dx/distance; facingY=dy/distance; }
-        if (state == State.WINDUP) { if (stateTime >= 0.65) { release(player, projectiles); state=State.RECOVERY; stateTime=0; } return; }
+        if (state == State.WINDUP) { if (stateTime >= 0.65) { release(projectiles); state=State.RECOVERY; stateTime=0; } return; }
         if (state == State.RECOVERY) { if (stateTime >= 0.8) { state=State.CHASE; stateTime=0; } return; }
         if (distance > 110 && type.speedFactor() > 0) {
             double step = GameConfig.PLAYER_BASE_SPEED * type.speedFactor() * dt;
@@ -27,7 +27,9 @@ public final class Enemy {
         }
         if (attackCooldown <= 0 && distance < 520) { state=State.WINDUP; stateTime=0; attackCooldown=2.0; }
     }
-    private void release(Player player, EnemyProjectileSystem projectiles) {
+    // 参数 player 未被使用（IDE 的 Unused parameter 检查会报）：弹体朝自身朝向飞，不需要玩家位置。
+    // 按注释保留旧签名备查。
+    private void release(/* Player player, */ EnemyProjectileSystem projectiles) {
         double speed = GameConfig.LIGHT_PROJECTILE_SPEED * 0.65;
         double radius = type == EnemyType.WATCHER ? 12 : type == EnemyType.GOLEM ? 10 : 7;
         projectiles.add(new EnemyProjectile(x, y, facingX*speed, facingY*speed, radius, world, 3.0, true));
