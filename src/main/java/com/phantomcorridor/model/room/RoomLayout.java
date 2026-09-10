@@ -74,18 +74,31 @@ public record RoomLayout(RoomShape shape, List<RoomArea> areas, List<Wall> walls
     private static List<Wall> createObstacles(List<RoomArea> areas, int count, Random random) {
         List<Wall> walls = new ArrayList<>();
         RoomArea primary = areas.getFirst();
-        for (int i = 0; i < count; i++) {
+        int attempts = 0;
+        while (walls.size() < count && attempts++ < count * 40) {
             boolean pillar = random.nextBoolean();
             double width = pillar ? 32 + random.nextInt(42) : 72 + random.nextInt(95);
             double height = pillar ? 32 + random.nextInt(42) : 24 + random.nextInt(38);
             if (!pillar && random.nextBoolean()) {
                 double swap = width; width = height; height = swap;
             }
-            double x = primary.x() + 90 + random.nextDouble() * Math.max(1, primary.width() - width - 180);
-            double y = primary.y() + 90 + random.nextDouble() * Math.max(1, primary.height() - height - 180);
-            if (Math.hypot(x + width / 2 - CENTER_X, y + height / 2 - CENTER_Y) < 105) {
-                x = primary.x() + 58;
-            }
+            double x = primary.x() + 112 + random.nextDouble() * Math.max(1, primary.width() - width - 224);
+            double y = primary.y() + 112 + random.nextDouble() * Math.max(1, primary.height() - height - 224);
+            double cx = x + width / 2, cy = y + height / 2;
+            // 门口保留完整通道，墙边保留角色半径+缓冲，避免生成不可进入的窄缝。
+            boolean nearDoor = (Math.abs(cx - CENTER_X) < 96 && (Math.abs(cy - primary.y()) < 128
+                    || Math.abs(cy - (primary.y() + primary.height())) < 128))
+                    || (Math.abs(cy - CENTER_Y) < 96 && (Math.abs(cx - primary.x()) < 128
+                    || Math.abs(cx - (primary.x() + primary.width())) < 128));
+            if (nearDoor || x < primary.x() + 96 || y < primary.y() + 96
+                    || x + width > primary.x() + primary.width() - 96
+                    || y + height > primary.y() + primary.height() - 96) continue;
+            final double candidateX = x, candidateY = y;
+            final double candidateWidth = width, candidateHeight = height;
+            boolean overlaps = walls.stream().anyMatch(w ->
+                    candidateX < w.x() + w.width() + 28 && candidateX + candidateWidth + 28 > w.x()
+                            && candidateY < w.y() + w.height() + 28 && candidateY + candidateHeight + 28 > w.y());
+            if (overlaps) continue;
             WorldType world = switch (random.nextInt(3)) {
                 case 0 -> WorldType.LIGHT;
                 case 1 -> WorldType.SHADOW;

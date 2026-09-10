@@ -58,7 +58,7 @@ public final class EnemySystem {
 
     private void spawn(EnemyKind kind, WorldType world, Room room, Player player,
                        RoomNavigationSystem navigation, Random random) {
-        for (int attempt = 0; attempt < 64; attempt++) {
+        for (int attempt = 0; attempt < 128; attempt++) {
             RoomArea area = room.areas().get(random.nextInt(room.areas().size()));
             double x = area.x() + 58 + random.nextDouble() * Math.max(1, area.width() - 116);
             double y = area.y() + 58 + random.nextDouble() * Math.max(1, area.height() - 116);
@@ -68,7 +68,7 @@ public final class EnemySystem {
                 return;
             }
         }
-        enemies.add(new Enemy(kind, world, (room.minX() + room.maxX()) / 2.0 + 130, (room.minY() + room.maxY()) / 2.0));
+        // 找不到合法点时不生成，避免敌人出生在墙/障碍物内部。
     }
 
     public void update(double dt, Player player, PlayerAttackSystem playerAttacks,
@@ -88,8 +88,12 @@ public final class EnemySystem {
             }
             if (enemy.getWorld() != player.getCurrentWorld()) continue;
             enemy.updateTimers(dt);
+            double distance = Math.hypot(enemy.getX() - player.getX(), enemy.getY() - player.getY());
+            double detection = detectionRange(enemy.getKind());
+            if (distance > detection || !navigation.isSegmentClear(enemy.getX(), enemy.getY(),
+                    player.getX(), player.getY(), enemyRadius(enemy), enemy.getWorld())) continue;
             moveTowardPlayer(enemy, player, navigation, dt);
-            if (enemy.canAttack()) fire(enemy, player);
+            if (enemy.canAttack() && distance <= attackRange(enemy.getKind())) fire(enemy, player);
         }
         updateEnemyAttacks(dt, player, navigation);
     }
@@ -100,7 +104,7 @@ public final class EnemySystem {
                 if (!enemy.isDead() && projectile.getWorld() == enemy.getWorld()
                         && CollisionUtil.circleIntersectsCircle(projectile.getX(), projectile.getY(), projectile.getRadius(),
                         enemy.getX(), enemy.getY(), enemyRadius(enemy))) {
-                    enemy.damage(1);
+                    enemy.damage(player.getAttackDamage());
                     projectile.expire();
                     break;
                 }
@@ -112,7 +116,7 @@ public final class EnemySystem {
                 if (enemy.getWorld() != WorldType.SHADOW || enemy.getLastMeleeHitId() == attackId) continue;
                 if (Math.hypot(enemy.getX() - player.getX(), enemy.getY() - player.getY())
                         <= GameConfig.SHADOW_MELEE_RANGE + enemyRadius(enemy)) {
-                    enemy.damage(1);
+                    enemy.damage(player.getAttackDamage());
                     enemy.setLastMeleeHitId(attackId);
                 }
             }
@@ -129,9 +133,24 @@ public final class EnemySystem {
         };
         if (distance <= desiredDistance || distance < 0.001) return;
         double step = GameConfig.PLAYER_BASE_SPEED * enemy.getKind().speedMultiplier() * dt;
+        double radius = enemyRadius(enemy);
         double nx = enemy.getX() + dx / distance * step;
         double ny = enemy.getY() + dy / distance * step;
-        if (navigation.canOccupy(nx, ny, enemyRadius(enemy), enemy.getWorld())) enemy.setPosition(nx, ny);
+        if (navigation.canOccupy(nx, ny, radius, enemy.getWorld())) {
+            enemy.setPosition(nx, ny);
+            return;
+        }
+        // 简易局部寻路：沿障碍边缘尝试切向方向，避免直线撞墙后完全僵住。
+        double tx = -dy / distance, ty = dx / distance;
+        for (int sign : new int[]{1, -1}) {
+            double sx = enemy.getX() + tx * sign * step;
+            double sy = enemy.getY() + ty * sign * step;
+            if (navigation.canOccupy(sx, sy, radius, enemy.getWorld())
+                    && navigation.isSegmentClear(enemy.getX(), enemy.getY(), sx, sy, radius, enemy.getWorld())) {
+                enemy.setPosition(sx, sy);
+                return;
+            }
+        }
     }
 
     private void fire(Enemy enemy, Player player) {
@@ -164,10 +183,34 @@ public final class EnemySystem {
 
     /** 切界时不能留下看不见的旧世界伤害。 */
     public void onWorldChanged(WorldType currentWorld) { attacks.removeIf(attack -> attack.getWorld() != currentWorld); }
+    public void spawnEventEnemies(Room room, long seed, Player player, RoomNavigationSystem navigation) {
+        Random random = new Random(seed ^ room.id() * 0x51ED270BL);
+        enemies.clear(); attacks.clear(); activeRoomId = room.id();
+        int count = 2 + random.nextInt(2);
+        for (int i = 0; i < count; i++) {
+            EnemyKind kind = i == 0 ? EnemyKind.WOLF : EnemyKind.LANTERN;
+            spawn(kind, i % 2 == 0 ? WorldType.LIGHT : WorldType.SHADOW, room, player, navigation, random);
+        }
+    }
     public boolean isRoomCleared() { return enemies.isEmpty(); }
     public int getCount(WorldType world) { return (int) enemies.stream().filter(enemy -> enemy.getWorld() == world).count(); }
     public int consumeKills() { int result = killsSinceLastRead; killsSinceLastRead = 0; return result; }
     public List<Enemy> getEnemies() { return Collections.unmodifiableList(enemies); }
     public List<EnemyAttack> getAttacks() { return Collections.unmodifiableList(attacks); }
+    private static double detectionRange(EnemyKind kind) {
+        return switch (kind) {
+            case LANTERN, MAGE -> 360.0;
+            case WOLF -> 300.0;
+            case GOLEM -> 240.0;
+            case EXECUTIONER, BELL -> 430.0;
+            case WATCHER -> 560.0;
+        };
+    }
+    private static double attackRange(EnemyKind kind) {
+        return switch (kind) {
+            case LANTERN, MAGE, BELL, WATCHER -> 520.0;
+            default -> 150.0;
+        };
+    }
     private static double enemyRadius(Enemy enemy) { return enemy.isBoss() ? 46.0 : enemy.getKind().elite() ? 34.0 : 27.0; }
 }

@@ -8,6 +8,7 @@ import com.phantomcorridor.model.entity.Player;
 import com.phantomcorridor.model.entity.PlayerAnimationState;
 import com.phantomcorridor.model.combat.Projectile;
 import com.phantomcorridor.model.combat.EnemyAttack;
+import com.phantomcorridor.model.combat.EnemyProjectile;
 import com.phantomcorridor.model.entity.Enemy;
 import com.phantomcorridor.model.entity.EnemyKind;
 import com.phantomcorridor.model.room.Direction;
@@ -44,6 +45,9 @@ public final class GameRenderer {
     private static final Image[] SHADOW_SLASHES = loadSeries("black_magenta", "effects_aligned", "slash_arc_right", 4);
     private static final Image[] LIGHT_AURA = loadSeries("white_cyan", "effects_aligned", "aura", 3);
     private static final Image[] SHADOW_AURA = loadSeries("black_magenta", "effects_aligned", "aura", 3);
+    private static final Image REWARD_ICONS = loadUiImage("reward_icons_v1.png");
+    private static final Image WEAPON_ICONS = loadUiImage("weapons_v1.png");
+    private static final Image EQUIPMENT_ICONS = loadUiImage("equipment_v1.png");
     private static final Map<String, Image> MONSTER_IMAGES = new HashMap<>();
 
     public void render(GraphicsContext g, GameSession session, double fps) {
@@ -55,6 +59,8 @@ public final class GameRenderer {
         drawPhaseWalls(g, session, light);
         drawEnemies(g, session, player.getCurrentWorld());
         drawEnemyAttacks(g, session, player.getCurrentWorld());
+        drawPickups(g, session);
+        drawInteractionPrompt(g, session);
         drawPlayer(g, player, light);
         // 攻击层在角色之后绘制，避免角色把斩击和投射物遮住。
         drawAttacks(g, session, light);
@@ -64,6 +70,7 @@ public final class GameRenderer {
         drawMiniMap(g, session, light);
         drawRoomAnnouncement(g, session);
         drawControls(g, light);
+        if (player.getHp() <= 0) drawDeathOverlay(g, session);
     }
 
     private void drawPhasePulse(GraphicsContext g, GameSession session, boolean light) {
@@ -224,46 +231,27 @@ public final class GameRenderer {
 
     private void drawEnemies(GraphicsContext g, GameSession session, boolean light) {
         for (Enemy enemy : session.getEnemies().getEnemies()) {
-            if ((enemy.world() == WorldType.LIGHT) != light) continue;
-            String action = enemy.state() == Enemy.State.WINDUP ? "attack_windup"
-                    : enemy.state() == Enemy.State.RECOVERY ? "attack_recovery"
-                    : enemy.state() == Enemy.State.HURT ? "hurt"
-                    : enemy.state() == Enemy.State.CHASE ? "move" : "idle";
-            String direction = Math.abs(enemy.facingX()) > Math.abs(enemy.facingY())
-                    ? (enemy.facingX() < 0 ? "left" : "right") : (enemy.facingY() < 0 ? "back" : "front");
-            var resource = getClass().getResource("/com/phantomcorridor/enemies/atlases/" + enemy.type().id()
+            if ((enemy.getWorld() == WorldType.LIGHT) != light) continue;
+            String action = enemy.getAlertRemaining() > 0.0 ? "attack_windup" : "idle";
+            String direction = "front";
+            var resource = getClass().getResource("/com/phantomcorridor/enemies/atlases/" + enemy.getKind().assetId()
                     + "/" + (light ? "light" : "shadow") + "/body/" + action + "/" + direction + ".png");
-            if (resource == null) resource = getClass().getResource("/com/phantomcorridor/enemies/atlases/" + enemy.type().id()
+            if (resource == null) resource = getClass().getResource("/com/phantomcorridor/enemies/atlases/" + enemy.getKind().assetId()
                     + "/" + (light ? "light" : "shadow") + "/body/idle/front.png");
             if (resource == null) continue;
             Image atlas = new Image(resource.toExternalForm(), false);
             double frameW = atlas.getWidth() / 4.0;
-            int frame = Math.min(3, (int) (enemy.stateTime() * 6.0) % 4);
-            double size = enemy.type() == com.phantomcorridor.model.combat.EnemyType.WATCHER ? 260
-                    : enemy.type().id().startsWith("e") ? 180 : 132;
+            int frame = 0;
+            double size = enemy.isBoss() ? 260 : enemy.getKind().elite() ? 180 : 132;
             double h = size * atlas.getHeight() / Math.max(1.0, atlas.getWidth() / 4.0);
             g.drawImage(atlas, frame * frameW, 0, frameW, atlas.getHeight(),
                         enemy.getX() - size / 2.0, enemy.getY() - h * .875, size, h);
             g.setFill(Color.rgb(20, 10, 18, .8)); g.fillRect(enemy.getX() - 28, enemy.getY() - h * .95, 56, 5);
             g.setFill(light ? Color.web("#f1c56e") : Color.web("#d783ff"));
-            g.fillRect(enemy.getX() - 28, enemy.getY() - h * .95, 56 * enemy.hp() / enemy.type().maxHp(), 5);
-            if (enemy.state() == Enemy.State.WINDUP) {
+            g.fillRect(enemy.getX() - 28, enemy.getY() - h * .95, 56.0 * enemy.getHp() / enemy.getMaxHp(), 5);
+            if (enemy.getAlertRemaining() > 0.0) {
                 g.setStroke(light ? Color.web("#ffe89a") : Color.web("#ed8cff"));
                 g.setLineWidth(3); g.strokeOval(enemy.getX() - 28, enemy.getY() - 28, 56, 56);
-            }
-            if (enemy.isAttackEffectVisible()) {
-                String effect = "/com/phantomcorridor/enemies/effects/" + enemy.type().id() + "/"
-                        + (light ? "light" : "shadow") + "/impact/right_01.png";
-                var fx = getClass().getResource(effect);
-                if (fx != null) {
-                    Image image = new Image(fx.toExternalForm(), false);
-                    double effectSize = size * 1.15;
-                    boolean mirror = enemy.facingX() < 0;
-                    g.setGlobalBlendMode(BlendMode.ADD);
-                    g.drawImage(image, mirror ? enemy.getX() + effectSize / 2 : enemy.getX() - effectSize / 2,
-                            enemy.getY() - effectSize * .55, mirror ? -effectSize : effectSize, effectSize);
-                    g.setGlobalBlendMode(BlendMode.SRC_OVER);
-                }
             }
         }
     }
@@ -274,17 +262,87 @@ public final class GameRenderer {
                 case COIN -> Color.web("#f7d56e");
                 case PHASE_FRAGMENT -> Color.web("#b882ff");
                 case HEALTH -> Color.web("#e86b70");
+                case ITEM -> Color.web("#70d8ff");
+                case EQUIPMENT -> Color.web("#f0c86e");
             };
-            g.setFill(color); g.fillRect(pickup.x() - 7, pickup.y() - 7, 14, 14);
+            int icon = pickup.type() == com.phantomcorridor.model.Pickup.Type.COIN ? 1
+                    : pickup.type() == com.phantomcorridor.model.Pickup.Type.ITEM ? 2 + Math.floorMod(pickup.amount(), 6) : -1;
+            if (pickup.type() == com.phantomcorridor.model.Pickup.Type.EQUIPMENT) {
+                Image source = pickup.amount() < 3 ? WEAPON_ICONS : EQUIPMENT_ICONS;
+                int local = pickup.amount() % 3;
+                if (source != null) g.drawImage(source, local * source.getWidth() / 3.0, 0,
+                        source.getWidth() / 3.0, source.getHeight(), pickup.x() - 24, pickup.y() - 24, 48, 48);
+                else { g.setFill(color); g.fillRect(pickup.x() - 8, pickup.y() - 8, 16, 16); }
+            } else if (icon >= 0 && REWARD_ICONS != null) {
+                double cellW = REWARD_ICONS.getWidth() / 4.0, cellH = REWARD_ICONS.getHeight() / 2.0;
+                double sx = (icon % 4) * cellW, sy = (icon / 4) * cellH;
+                g.drawImage(REWARD_ICONS, sx, sy, cellW, cellH, pickup.x() - 22, pickup.y() - 22, 44, 44);
+            } else {
+                g.setFill(color);
+                g.fillRect(pickup.x() - 7, pickup.y() - 7, 14, 14);
+            }
             g.setStroke(Color.color(color.getRed(), color.getGreen(), color.getBlue(), .45));
             g.strokeRect(pickup.x() - 11, pickup.y() - 11, 22, 22);
         }
         if (session.isChestVisible()) {
             Room room = session.getNavigation().getCurrentRoom();
             double x = room.doorCenter(Direction.NORTH), y = room.minY() + 76;
-            g.setFill(Color.web("#8d542e")); g.fillRect(x - 22, y - 16, 44, 28);
-            g.setFill(Color.web("#f3cf6b")); g.fillRect(x - 4, y - 4, 8, 10);
-            g.setStroke(Color.web("#f0b858")); g.strokeRect(x - 22, y - 16, 44, 28);
+            if (REWARD_ICONS != null) {
+                double cellW = REWARD_ICONS.getWidth() / 4.0, cellH = REWARD_ICONS.getHeight() / 2.0;
+                g.drawImage(REWARD_ICONS, 0, 0, cellW, cellH, x - 32, y - 32, 64, 64);
+            } else {
+                g.setFill(Color.web("#8d542e")); g.fillRect(x - 22, y - 16, 44, 28);
+                g.setFill(Color.web("#f3cf6b")); g.fillRect(x - 4, y - 4, 8, 10);
+                g.setStroke(Color.web("#f0b858")); g.strokeRect(x - 22, y - 16, 44, 28);
+            }
+        }
+    }
+
+    private void drawDeathOverlay(GraphicsContext g, GameSession session) {
+        g.setFill(Color.rgb(8, 4, 12, 0.78));
+        g.fillRect(0, 0, AppConfig.VIEW_WIDTH, AppConfig.VIEW_HEIGHT);
+        g.setTextAlign(TextAlignment.CENTER);
+        g.setFill(Color.web("#f0d7e8"));
+        g.setFont(Font.font("Microsoft YaHei UI", FontWeight.BOLD, 42));
+        g.fillText("倒下了", AppConfig.VIEW_WIDTH / 2.0, AppConfig.VIEW_HEIGHT / 2.0 - 24);
+        g.setFont(Font.font("Microsoft YaHei UI", 18));
+        g.setFill(Color.web("#c9b4ca"));
+        g.fillText("本次探索结束 · 金币 " + session.getCoins(), AppConfig.VIEW_WIDTH / 2.0, AppConfig.VIEW_HEIGHT / 2.0 + 18);
+        g.setFont(Font.font("Microsoft YaHei UI", 16));
+        g.fillText("[R] 重新开始        [M] 返回主菜单", AppConfig.VIEW_WIDTH / 2.0, AppConfig.VIEW_HEIGHT / 2.0 + 62);
+        g.setTextAlign(TextAlignment.LEFT);
+    }
+
+    private void drawInteractionPrompt(GraphicsContext g, GameSession session) {
+        String prompt = session.getInteractionPrompt();
+        if (prompt.isEmpty()) return;
+        Player p = session.getPlayer();
+        g.setFill(Color.rgb(8, 6, 12, .9)); g.fillRoundRect(p.getX() + 24, p.getY() - 56, 108, 30, 8, 8);
+        g.setStroke(Color.web("#f2d27a")); g.strokeRoundRect(p.getX() + 24, p.getY() - 56, 108, 30, 8, 8);
+        g.setFill(Color.web("#fff0bb")); g.setFont(Font.font("Microsoft YaHei UI", FontWeight.BOLD, 13));
+        g.fillText(prompt, p.getX() + 35, p.getY() - 36);
+    }
+
+    private void drawEquipmentBar(GraphicsContext g, GameSession session) {
+        Player player = session.getPlayer();
+        g.setFill(Color.rgb(4, 4, 8, .74));
+        g.fillRoundRect(56, 228, 370, 84, 12, 12);
+        g.setFill(Color.web("#d8c9df")); g.setFont(Font.font("Microsoft YaHei UI", 12));
+        g.fillText("装备（最多 3 件）", 70, 248);
+        g.setFill(Color.web("#a99bb2"));
+        g.fillText("攻击 1 + " + (player.getAttackDamage() - 1) + "  ·  已装备属性实时生效", 70, 306);
+        int index = 0;
+        for (var item : player.getEquipment()) {
+            Image source = item.iconIndex() < 3 ? WEAPON_ICONS : EQUIPMENT_ICONS;
+            int local = item.iconIndex() % 3;
+            double x = 110 + index * 52;
+            if (source != null) g.drawImage(source, local * source.getWidth() / 3.0, 0,
+                    source.getWidth() / 3.0, source.getHeight(), x, 255, 42, 42);
+            if (Math.hypot(session.getAimX() - (x + 21), session.getAimY() - 276) < 26) {
+                g.setFill(Color.rgb(10, 8, 16, .94)); g.fillRoundRect(x, 300, 220, 38, 7, 7);
+                g.setFill(Color.WHITE); g.fillText(item.displayName() + "：" + item.description(), x + 6, 324);
+            }
+            index++;
         }
     }
 
@@ -532,6 +590,11 @@ public final class GameRenderer {
         return frames.toArray(Image[]::new);
     }
 
+    private static Image loadUiImage(String name) {
+        var resource = GameRenderer.class.getResource("/com/phantomcorridor/ui/" + name);
+        return resource == null ? null : new Image(resource.toExternalForm(), false);
+    }
+
     private void drawHud(GraphicsContext g, GameSession session, double fps, boolean light) {
         Color domain = light ? LIGHT_GOLD : SHADOW_VIOLET;
         Player player = session.getPlayer();
@@ -596,13 +659,14 @@ public final class GameRenderer {
         g.setFill(Color.rgb(230, 220, 235, 0.28));
         g.setFont(Font.font("Consolas", 11));
         g.fillText(String.format("%.0f FPS", fps), AppConfig.VIEW_WIDTH - 103, 169);
+        drawEquipmentBar(g, session);
     }
 
     private void drawControls(GraphicsContext g, boolean light) {
         g.setTextAlign(TextAlignment.CENTER);
         g.setFill(light ? Color.rgb(237, 210, 156, 0.56) : Color.rgb(198, 169, 230, 0.58));
         g.setFont(Font.font("Microsoft YaHei UI", 13));
-        g.fillText("WASD / 方向键移动    ·    鼠标瞄准 / 左键攻击    ·    TAB 穿梭双界    ·    ESC 暂停",
+        g.fillText("WASD / 方向键移动    ·    鼠标瞄准 / 左键攻击    ·    E 交互    ·    TAB 穿梭双界    ·    ESC 暂停",
                 AppConfig.VIEW_WIDTH / 2.0, AppConfig.VIEW_HEIGHT - 24.0);
         g.setTextAlign(TextAlignment.LEFT);
     }

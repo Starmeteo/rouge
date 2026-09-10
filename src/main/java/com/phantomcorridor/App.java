@@ -77,7 +77,7 @@ public class App extends Application {
         loginView = loginController.getView();
         mainMenuView = mainMenuController.getView();
         gameView = new GameView();
-        gameController = new GameController(gameView, this::showPause, settings);
+        gameController = new GameController(gameView, this::showPause, settings, this::showMainMenu);
         pauseView = new PauseView(this::resumeGame, this::showMainMenu);
         root.getChildren().addAll(loginView, mainMenuView, gameView, pauseView);
 

@@ -20,11 +20,17 @@ public final class GameController {
     private double aimX;
     private double aimY;
     private final Settings settings;
+    private final Runnable onMainMenu;
 
     public GameController(GameView view, Runnable onPauseRequested, Settings settings) {
+        this(view, onPauseRequested, settings, () -> { });
+    }
+
+    public GameController(GameView view, Runnable onPauseRequested, Settings settings, Runnable onMainMenu) {
         this.view = view;
         this.onPauseRequested = onPauseRequested;
         this.settings = settings;
+        this.onMainMenu = onMainMenu;
         this.loop = new GameLoop() {
             @Override
             protected void update(double dt) {
@@ -70,6 +76,11 @@ public final class GameController {
     }
 
     private void keyPressed(KeyCode key) {
+        if (session.getPlayer().getHp() <= 0) {
+            if (key == KeyCode.R) newRun();
+            else if (key == KeyCode.M) onMainMenu.run();
+            return;
+        }
         switch (key) {
             case W, UP -> input.setUp(true);
             case S, DOWN -> input.setDown(true);
@@ -81,6 +92,7 @@ public final class GameController {
                 }
                 shiftHeld = true;
             }
+            case E -> session.requestInteract();
             case ESCAPE, P -> onPauseRequested.run();
             default -> { }
         }
