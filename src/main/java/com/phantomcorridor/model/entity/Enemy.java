@@ -18,6 +18,15 @@ public final class Enemy {
     private double avoidanceHeading = Double.NaN;
     private double avoidanceStuckTime;
     private int lastMeleeHitId = -1;
+    /** 素材包中的 body 动作目录名，例如 move、attack_windup、shield_bash_release。 */
+    private String animationAction = "idle";
+    /** front / back / right / left。左向优先使用已导出的镜像帧，不再二次镜像。 */
+    private String facing = "front";
+    private double animationTime;
+    private double animationDuration = 1.0 / 6.0;
+    private boolean animationLoop = true;
+    private int nextSkillIndex;
+    private double guardRemaining;
 
     public Enemy(EnemyKind kind, WorldType world, double x, double y) {
         this.kind = kind;
@@ -39,13 +48,59 @@ public final class Enemy {
     public int getHp() { return hp; }
     public int getMaxHp() { return kind.hitPoints(); }
     public boolean isDead() { return hp <= 0; }
-    public void damage(int amount) { hp = Math.max(0, hp - Math.max(0, amount)); }
+    /**
+     * 伤害只在存活期间结算一次。受击和死亡都由本体动作接管，死亡帧播完前不立刻移除实体，
+     * 这样不会出现“血条刚空就闪没”的问题。
+     */
+    public void damage(int amount) {
+        if (isDead()) return;
+        hp = Math.max(0, hp - Math.max(0, amount));
+        playAnimation(hp <= 0 ? "death" : "hurt", hp <= 0 ? 0.70 : 0.28, false);
+    }
     public double getAlertRemaining() { return alertRemaining; }
-    public void updateTimers(double dt) { alertRemaining = Math.max(0.0, alertRemaining - dt); attackCooldown = Math.max(0.0, attackCooldown - dt); }
+    public void updateTimers(double dt) {
+        alertRemaining = Math.max(0.0, alertRemaining - dt);
+        attackCooldown = Math.max(0.0, attackCooldown - dt);
+        guardRemaining = Math.max(0.0, guardRemaining - dt);
+        animationTime += Math.max(0.0, dt);
+    }
     public boolean canAttack() { return alertRemaining <= 0.0 && attackCooldown <= 0.0; }
     public void setAttackCooldown(double seconds) { attackCooldown = seconds; }
     public int getLastMeleeHitId() { return lastMeleeHitId; }
     public void setLastMeleeHitId(int id) { lastMeleeHitId = id; }
+
+    public String getAnimationAction() { return animationAction; }
+    public String getFacing() { return facing; }
+    public double getAnimationTime() { return animationTime; }
+    public double getAnimationDuration() { return animationDuration; }
+    public boolean isAnimationLooping() { return animationLoop; }
+    public boolean isAnimationFinished() { return !animationLoop && animationTime >= animationDuration; }
+    public int nextSkillIndex() { return nextSkillIndex++; }
+
+    /** 切换动作时才重置计时，循环动作重复赋值不会导致待机/移动第一帧抖动。 */
+    public void playAnimation(String action, double duration, boolean loop) {
+        if (animationAction.equals(action) && animationLoop == loop) return;
+        animationAction = action;
+        animationDuration = Math.max(0.05, duration);
+        animationLoop = loop;
+        animationTime = 0.0;
+    }
+
+    public void setFacingFromVector(double dx, double dy) {
+        if (Math.abs(dx) < 0.001 && Math.abs(dy) < 0.001) return;
+        if (Math.abs(dx) >= Math.abs(dy)) facing = dx >= 0.0 ? "right" : "left";
+        else facing = dy >= 0.0 ? "front" : "back";
+    }
+
+    public boolean isInLockedAnimation() {
+        return !animationLoop && !animationAction.equals("hurt") && !animationAction.equals("death")
+                && !animationAction.equals("idle") && !animationAction.equals("move");
+    }
+    public boolean isGuarding() { return guardRemaining > 0.0; }
+    public void beginGuard(double seconds) {
+        guardRemaining = Math.max(0.0, seconds);
+        playAnimation("guard", seconds, true);
+    }
 
     /** 是否已锁定玩家（索敌成功）。锁定后即使被墙挡住视线也会持续追击。 */
     public boolean isAware() { return aware; }
