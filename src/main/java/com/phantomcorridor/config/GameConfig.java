@@ -25,6 +25,41 @@ public final class GameConfig {
     /** 影形态额外移动速度加成倍率（§3.2 影形态"移动略快"，占位） */
     public static final double SHADOW_SPEED_MULTIPLIER = 1.15;
 
+    // ---- 闪避冲刺（空格） ----
+    /**
+     * 冲刺距离（像素）。
+     *
+     * <p>固定距离而不是固定速度：形体的移动速度加成（影形态 1.15 倍）只影响走路，
+     * 冲刺距离在两种形态下保持一致，玩家才能凭手感判断"能不能从这一击里翻出去"。
+     */
+    public static final double DASH_DISTANCE = 150.0;
+
+    /** 冲刺持续时间（秒）：冲完这段位移即恢复控制。 */
+    public static final double DASH_DURATION = 0.18;
+
+    /** 冲刺速度（像素/秒）：由固定距离与持续时间推出，约 833 像素/秒。 */
+    public static final double DASH_SPEED = DASH_DISTANCE / DASH_DURATION;
+
+    /**
+     * 冲刺内置冷却（秒）：从冲刺结束开始计时，冷却中再次按空格不会触发。
+     *
+     * <p>冷却从"冲完"而不是"起手"开始算，这样 1 秒就是两次冲刺之间实际要等的间隔。
+     */
+    public static final double DASH_COOLDOWN = 1.0;
+
+    /**
+     * 冲刺残影（拖尾）单段存活时间（秒）。
+     *
+     * <p>略长于冲刺本身，冲刺结束后拖尾会自然消散，而不是跟着动作一起"啪"地消失。
+     */
+    public static final double DASH_TRAIL_LIFETIME = 0.28;
+
+    /** 冲刺残影的段数上限：寿命内按帧记录也不会超过这个数，避免异常长帧堆积贴图。 */
+    public static final int DASH_TRAIL_MAX = 32;
+
+    /** 冲刺残影的最初不透明度：越接近玩家本体越淡，避免拖尾盖住角色。 */
+    public static final double DASH_TRAIL_ALPHA = 0.34;
+
     // ---- 第 3 天：双形态攻击 ----
     public static final double LIGHT_PROJECTILE_SPEED = 560.0;
     public static final double LIGHT_PROJECTILE_RADIUS = 6.0;

@@ -38,6 +38,7 @@ public final class GameSession {
     // 需要“是否在战斗中”时直接问 enemies.isRoomCleared() 即可，先注释保留。
     // private boolean combatActive;
     private boolean interactRequested;
+    private boolean dashRequested;
 
     public void newRun() { newRun(""); }
 
@@ -56,6 +57,7 @@ public final class GameSession {
         this.difficulty = difficulty == null ? Difficulty.NORMAL : difficulty;
         floor = 1;
         runCleared = false;
+        dashRequested = false;
         aimX = player.getX() + 1.0;
         aimY = player.getY();
         startFloor();
@@ -103,12 +105,26 @@ public final class GameSession {
         phasePulseVisibleRemaining = Math.max(0.0, phasePulseVisibleRemaining - dt);
         roomAnnouncementRemaining = Math.max(0.0, roomAnnouncementRemaining - Math.max(0.0, dt));
         if (player.getHp() <= 0 || runCleared) {
+            player.updateDash(dt);
             player.updateAnimation(dt, 0.0, 0.0, false, false);
             return;
         }
         aimX = targetX;
         aimY = targetY;
-        navigation.move(player, movementX, movementY, dt);
+        // 冲刺优先于普通移动：冲刺期间忽略方向输入，位移完全由冲刺方向决定。
+        if (dashRequested) {
+            dashRequested = false;
+            player.tryStartDash(movementX, movementY);
+        }
+        if (player.isDashing()) {
+            // 只走"这一段冲刺还剩的时间"：否则最后一帧会按整帧位移，固定 150 像素会随帧对齐漂移。
+            double dashStep = Math.min(dt, player.getDashTimeRemaining());
+            navigation.dash(player, player.getDashDirectionX(), player.getDashDirectionY(), dashStep);
+            player.recordDashTrail();
+        } else {
+            navigation.move(player, movementX, movementY, dt);
+        }
+        player.updateDash(dt);
         if (navigation.consumeRoomChanged()) {
             attackSystem.clearTransientAttacks();
             Room entered = navigation.getCurrentRoom();
@@ -183,6 +199,15 @@ public final class GameSession {
     public String getRoomAnnouncement() { return roomAnnouncement; }
     public double getRoomAnnouncementRemaining() { return roomAnnouncementRemaining; }
     public void requestInteract() { interactRequested = true; }
+
+    /**
+     * 请求一次闪避冲刺（空格）。
+     *
+     * <p>这里只登记意图，真正的起手判定（冷却、是否已在冲刺、阵亡）由
+     * {@link Player#tryStartDash(double, double)} 在下一逻辑帧统一处理：
+     * 输入层不该知道冲刺规则，也不该绕过冷却。
+     */
+    public void requestDash() { dashRequested = true; }
 
     /** 当前层数（从 1 开始）。 */
     public int getFloor() { return floor; }

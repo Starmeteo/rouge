@@ -29,11 +29,24 @@ public final class RoomNavigationSystem {
     }
 
     public void move(Player player, double directionX, double directionY, double dt) {
+        double speed = GameConfig.PLAYER_BASE_SPEED
+                * (player.getCurrentWorld() == WorldType.SHADOW ? GameConfig.SHADOW_SPEED_MULTIPLIER : 1.0);
+        displace(player, directionX, directionY, dt, speed);
+    }
+
+    /**
+     * 冲刺位移：与常规移动共用同一套碰撞、房间轮廓与切换门判定，只有速度换成冲刺速度。
+     *
+     * <p>冲刺不能走"直接改坐标"的捷径——那会让玩家穿墙、穿相位墙甚至直接穿过关着的门。
+     */
+    public void dash(Player player, double directionX, double directionY, double dt) {
+        displace(player, directionX, directionY, dt, GameConfig.DASH_SPEED);
+    }
+
+    private void displace(Player player, double directionX, double directionY, double dt, double speed) {
         roomChanged = false;
         double length = Math.hypot(directionX, directionY);
         if (length == 0.0) return;
-        double speed = GameConfig.PLAYER_BASE_SPEED
-                * (player.getCurrentWorld() == WorldType.SHADOW ? GameConfig.SHADOW_SPEED_MULTIPLIER : 1.0);
         double dx = directionX / length * speed * dt;
         double dy = directionY / length * speed * dt;
         double nextX = player.getX() + dx;
