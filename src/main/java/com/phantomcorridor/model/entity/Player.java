@@ -15,6 +15,9 @@ public final class Player {
     private double x;
     private double y;
     private double phaseEnergy;
+    private int attackCharges;
+    private int maxAttackCharges;
+    private double attackChargeRecoveryTimer;
     private WorldType currentWorld;
     private PlayerAnimationState animationState;
     private double animationTime;
@@ -31,6 +34,9 @@ public final class Player {
         this.x = x;
         this.y = y;
         this.phaseEnergy = GameConfig.PHASE_ENERGY_INITIAL;
+        this.maxAttackCharges = GameConfig.ATTACK_CHARGE_MAX;
+        this.attackCharges = maxAttackCharges;
+        this.attackChargeRecoveryTimer = 0.0;
         this.currentWorld = WorldType.LIGHT;
         this.animationState = PlayerAnimationState.IDLE;
         this.animationTime = 0.0;
@@ -57,6 +63,25 @@ public final class Player {
 
     public void consumePhaseEnergy(double amount) {
         phaseEnergy = clamp(phaseEnergy - Math.max(0.0, amount), 0.0, GameConfig.PHASE_ENERGY_MAX);
+    }
+
+    public void restoreAttackCharges(int amount) { attackCharges = Math.min(maxAttackCharges, attackCharges + Math.max(0, amount)); }
+    public void updateAttackCharges(double dt) {
+        if (attackCharges >= maxAttackCharges) { attackChargeRecoveryTimer = 0.0; return; }
+        attackChargeRecoveryTimer += Math.max(0.0, dt);
+        while (attackChargeRecoveryTimer >= GameConfig.ATTACK_CHARGE_RECOVERY_TIME
+                && attackCharges < maxAttackCharges) {
+            attackCharges++;
+            attackChargeRecoveryTimer -= GameConfig.ATTACK_CHARGE_RECOVERY_TIME;
+        }
+    }
+    public void increaseAttackChargeCapacity(int amount) {
+        maxAttackCharges = Math.max(GameConfig.ATTACK_CHARGE_MAX, maxAttackCharges + Math.max(0, amount));
+        attackCharges = maxAttackCharges;
+    }
+    public boolean consumeAttackCharge() {
+        if (attackCharges <= 0) return false;
+        attackCharges--; return true;
     }
 
     public void toggleWorld() {
@@ -89,6 +114,8 @@ public final class Player {
     public double getX() { return x; }
     public double getY() { return y; }
     public double getPhaseEnergy() { return phaseEnergy; }
+    public int getAttackCharges() { return attackCharges; }
+    public int getMaxAttackCharges() { return maxAttackCharges; }
     public WorldType getCurrentWorld() { return currentWorld; }
     public PlayerAnimationState getAnimationState() { return animationState; }
     public double getAnimationTime() { return animationTime; }

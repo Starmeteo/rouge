@@ -20,7 +20,10 @@ public final class MapGenerator {
         Set<String> occupied = new HashSet<>();
         occupied.add("0,0");
         for (int id = 1; id < RoomConfig.DEFAULT_ROOM_COUNT; id++) {
-            Room preferred = id <= 5 ? rooms.get(id - 1) : rooms.get(RandomUtil.nextInt(random, 1, id - 2));
+            Room preferred = id == RoomConfig.DEFAULT_ROOM_COUNT - 1
+                    ? rooms.stream().filter(room -> room.id() > 0 && hasFreeDirection(room, occupied))
+                    .findFirst().orElseThrow()
+                    : id <= 5 ? rooms.get(id - 1) : rooms.get(RandomUtil.nextInt(random, 1, id - 2));
             Room parent = hasFreeDirection(preferred, occupied) ? preferred : rooms.stream()
                     .filter(room -> hasFreeDirection(room, occupied)).findFirst().orElseThrow();
             Direction direction = findFreeDirection(random, parent, occupied);

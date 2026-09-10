@@ -13,6 +13,7 @@ import com.phantomcorridor.view.LoginView;
 import com.phantomcorridor.view.MainMenuView;
 import com.phantomcorridor.view.PauseView;
 import javafx.application.Application;
+import javafx.application.Platform;
 import javafx.scene.Scene;
 import javafx.scene.input.KeyCode;
 import javafx.scene.input.KeyCodeCombination;
@@ -56,10 +57,14 @@ public class App extends Application {
     private PauseView pauseView;
     private SceneManager sceneManager;
     private GameController gameController;
+    private double windowedWidth = AppConfig.VIEW_WIDTH;
+    private double windowedHeight = AppConfig.VIEW_HEIGHT;
 
     @Override
     public void start(Stage stage) {
         this.stage = stage;
+        root.setMinSize(0, 0);
+        root.setPrefSize(AppConfig.VIEW_WIDTH, AppConfig.VIEW_HEIGHT);
 
         // 玩家档案与偏好设置分离，恢复默认设置不会再清空玩家身份。
         Settings settings = new Settings();
@@ -81,12 +86,28 @@ public class App extends Application {
         scene.setOnKeyPressed(this::handleGlobalKeys);
 
         stage.setTitle(AppConfig.APP_TITLE);
-        stage.setResizable(false); // 固定窗口尺寸；全屏时逻辑分辨率保持 1280×960 不变
+        stage.setResizable(true);
         stage.setFullScreenExitHint("按 F11 或 Alt+Enter 退出全屏");
         // 屏蔽 JavaFX 默认的 Esc 退出全屏，避免与游戏暂停快捷键（Esc/P）冲突
         stage.setFullScreenExitKeyCombination(KeyCombination.NO_MATCH);
         stage.setScene(scene);
         stage.show();
+        stage.widthProperty().addListener((obs, oldValue, newValue) -> {
+            if (!stage.isFullScreen()) windowedWidth = newValue.doubleValue();
+        });
+        stage.heightProperty().addListener((obs, oldValue, newValue) -> {
+            if (!stage.isFullScreen()) windowedHeight = newValue.doubleValue();
+        });
+        stage.fullScreenProperty().addListener((obs, wasFullScreen, isFullScreen) -> {
+            if (!isFullScreen) {
+                Platform.runLater(() -> {
+                    stage.setWidth(windowedWidth);
+                    stage.setHeight(windowedHeight);
+                    root.requestLayout();
+                    gameView.requestLayout();
+                });
+            }
+        });
 
         // 应用启动后进入第一个场景：登录界面（§8.1）
         showLogin();
@@ -95,9 +116,15 @@ public class App extends Application {
     /** 全局快捷键处理：F11 / Alt+Enter 切换全屏 */
     private void handleGlobalKeys(KeyEvent event) {
         if (FULLSCREEN_F11.match(event) || FULLSCREEN_ALT_ENTER.match(event)) {
+            if (!stage.isFullScreen()) {
+                windowedWidth = stage.getWidth();
+                windowedHeight = stage.getHeight();
+            }
             stage.setFullScreen(!stage.isFullScreen());
+            event.consume();
         }
     }
+
 
     /** 进入登录界面（应用启动默认） */
     private void showLogin() {

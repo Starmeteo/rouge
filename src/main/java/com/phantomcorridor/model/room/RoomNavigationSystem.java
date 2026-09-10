@@ -133,10 +133,6 @@ public final class RoomNavigationSystem {
         }
         double[] safe = findNearestSafePosition(player.getX(), player.getY(), player.getCurrentWorld());
         if (safe != null) player.setPosition(safe[0], safe[1]);
-        // 第 6 天由存活敌人数接管；当前先保持整张地图可探索。
-        if (currentRoom.type() == RoomType.BATTLE || currentRoom.type() == RoomType.BOSS) {
-            currentRoom.setCleared(true);
-        }
     }
 
     private void discoverNeighbors(Room room) {

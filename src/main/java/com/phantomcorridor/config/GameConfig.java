@@ -29,11 +29,15 @@ public final class GameConfig {
     public static final double LIGHT_PROJECTILE_SPEED = 560.0;
     public static final double LIGHT_PROJECTILE_RADIUS = 6.0;
     public static final double LIGHT_PROJECTILE_LIFETIME = 1.8;
-    public static final double LIGHT_ATTACK_COOLDOWN = 0.22;
+    public static final double LIGHT_ATTACK_COOLDOWN = 0.45;
     public static final double SHADOW_MELEE_RANGE = 120.0;
     public static final double SHADOW_MELEE_ARC_DEGREES = 300.0;
     public static final double SHADOW_MELEE_VISIBLE_TIME = 0.13;
-    public static final double SHADOW_ATTACK_COOLDOWN = 0.15;
+    public static final double SHADOW_ATTACK_COOLDOWN = 0.55;
+    public static final int ATTACK_CHARGE_MAX = 5;
+    public static final int LIGHT_ATTACK_CHARGE_COST = 1;
+    public static final int SHADOW_ATTACK_CHARGE_COST = 1;
+    public static final double ATTACK_CHARGE_RECOVERY_TIME = 1.35;
 
     // ---- 玩家生命 ----
     /** 玩家最大生命值（需求未对双界版给出明确数值，沿用旧版 3 点作为占位，待 §7.2 道具加成时校调） */

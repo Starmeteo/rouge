@@ -63,6 +63,7 @@ public final class PlayerAttackSystem {
         double unitY = dy / length;
         meleeAngleRadians = Math.atan2(unitY, unitX);
         if (player.getCurrentWorld() == WorldType.LIGHT) {
+            if (!player.consumeAttackCharge()) return false;
             double offset = GameConfig.PLAYER_RADIUS + GameConfig.LIGHT_PROJECTILE_RADIUS + 3.0;
             projectiles.add(new Projectile(
                     player.getX() + unitX * offset, player.getY() + unitY * offset,
@@ -72,6 +73,7 @@ public final class PlayerAttackSystem {
                     GameConfig.LIGHT_PROJECTILE_LIFETIME));
             cooldownRemaining = GameConfig.LIGHT_ATTACK_COOLDOWN;
         } else {
+            if (!player.consumeAttackCharge()) return false;
             meleeVisibleRemaining = GameConfig.SHADOW_MELEE_VISIBLE_TIME;
             cooldownRemaining = GameConfig.SHADOW_ATTACK_COOLDOWN;
         }

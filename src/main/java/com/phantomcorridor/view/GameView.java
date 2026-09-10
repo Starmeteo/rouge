@@ -8,9 +8,12 @@ import javafx.animation.FadeTransition;
 import javafx.scene.canvas.Canvas;
 import javafx.scene.input.KeyCode;
 import javafx.scene.input.MouseButton;
+import javafx.scene.input.KeyEvent;
 import javafx.scene.layout.Region;
 import javafx.scene.layout.StackPane;
 import javafx.util.Duration;
+import java.awt.im.InputContext;
+import java.util.Locale;
 
 import java.util.function.Consumer;
 import java.util.function.BiConsumer;
@@ -39,14 +42,24 @@ public final class GameView extends StackPane implements SceneLifecycle {
         shiftFlash.setPrefSize(AppConfig.VIEW_WIDTH, AppConfig.VIEW_HEIGHT);
         shiftFlash.setVisible(false);
         getChildren().addAll(canvas, shiftFlash);
+        canvas.widthProperty().bind(widthProperty());
+        canvas.heightProperty().bind(heightProperty());
+        shiftFlash.prefWidthProperty().bind(widthProperty());
+        shiftFlash.prefHeightProperty().bind(heightProperty());
 
-        setOnKeyPressed(event -> keyPressed.accept(event.getCode()));
-        setOnKeyReleased(event -> keyReleased.accept(event.getCode()));
-        setOnMouseMoved(event -> pointerMoved.accept(event.getX(), event.getY()));
-        setOnMouseDragged(event -> pointerMoved.accept(event.getX(), event.getY()));
+        addEventFilter(KeyEvent.KEY_PRESSED, event -> {
+            if (event.getCode() == KeyCode.TAB) { keyPressed.accept(event.getCode()); event.consume(); }
+        });
+        addEventFilter(KeyEvent.KEY_RELEASED, event -> {
+            if (event.getCode() == KeyCode.TAB) { keyReleased.accept(event.getCode()); event.consume(); }
+        });
+        setOnKeyPressed(event -> { if (event.getCode() != KeyCode.TAB) { keyPressed.accept(event.getCode()); event.consume(); } });
+        setOnKeyReleased(event -> { if (event.getCode() != KeyCode.TAB) { keyReleased.accept(event.getCode()); event.consume(); } });
+        setOnMouseMoved(event -> pointerMoved.accept(logicalX(event.getX()), logicalY(event.getY())));
+        setOnMouseDragged(event -> pointerMoved.accept(logicalX(event.getX()), logicalY(event.getY())));
         setOnMousePressed(event -> {
             requestFocus();
-            pointerMoved.accept(event.getX(), event.getY());
+            pointerMoved.accept(logicalX(event.getX()), logicalY(event.getY()));
             if (event.getButton() == MouseButton.PRIMARY) {
                 attackChanged.accept(true);
             }
@@ -75,8 +88,17 @@ public final class GameView extends StackPane implements SceneLifecycle {
     }
 
     public void render(GameSession session, double fps) {
-        renderer.render(canvas.getGraphicsContext2D(), session, fps);
+        var g = canvas.getGraphicsContext2D();
+        double sx = canvas.getWidth() / AppConfig.VIEW_WIDTH;
+        double sy = canvas.getHeight() / AppConfig.VIEW_HEIGHT;
+        g.save();
+        g.scale(sx, sy);
+        renderer.render(g, session, fps);
+        g.restore();
     }
+
+    private double logicalX(double x) { return x * AppConfig.VIEW_WIDTH / Math.max(1.0, canvas.getWidth()); }
+    private double logicalY(double y) { return y * AppConfig.VIEW_HEIGHT / Math.max(1.0, canvas.getHeight()); }
 
     public void playWorldShift(WorldType world) {
         shiftFlash.getStyleClass().removeAll("shift-to-light", "shift-to-shadow");
@@ -93,6 +115,7 @@ public final class GameView extends StackPane implements SceneLifecycle {
     @Override
     public void onEnter() {
         requestFocus();
+        InputContext.getInstance().selectInputMethod(Locale.ENGLISH);
         enterAction.run();
     }
 

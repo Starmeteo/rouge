@@ -3,6 +3,7 @@ package com.phantomcorridor.model.combat;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import com.phantomcorridor.model.room.RoomNavigationSystem;
 
 /** 管理敌方弹幕；第 4 天先提供脉冲清弹，第 6 天敌人攻击直接接入此容器。 */
 public final class EnemyProjectileSystem {
@@ -22,9 +23,16 @@ public final class EnemyProjectileSystem {
         projectiles.removeIf(projectile -> {
             double dx = projectile.getX() - centerX;
             double dy = projectile.getY() - centerY;
-            return dx * dx + dy * dy <= radiusSquared;
+            return projectile.isPulseClearable() && dx * dx + dy * dy <= radiusSquared;
         });
         return before - projectiles.size();
+    }
+
+    public void update(double dt) { projectiles.forEach(p -> p.update(dt)); projectiles.removeIf(EnemyProjectile::isExpired); }
+    public void update(double dt, RoomNavigationSystem navigation) {
+        projectiles.forEach(p -> { p.update(dt); if (navigation != null && !navigation.canProjectileOccupy(
+                p.getX(), p.getY(), p.getRadius(), p.getWorld())) p.expire(); });
+        projectiles.removeIf(EnemyProjectile::isExpired);
     }
 
     public List<EnemyProjectile> getProjectiles() {
