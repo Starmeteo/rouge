@@ -7,6 +7,7 @@ import com.phantomcorridor.model.entity.Player;
 import com.phantomcorridor.model.combat.PlayerAttackSystem;
 import com.phantomcorridor.model.combat.EnemyProjectileSystem;
 import com.phantomcorridor.model.combat.EnemySystem;
+import com.phantomcorridor.model.combat.SummonRift;
 import com.phantomcorridor.model.dungeon.MapGenerator;
 import com.phantomcorridor.model.room.RoomContentSystem;
 import com.phantomcorridor.model.room.RoomNavigationSystem;
@@ -118,6 +119,11 @@ public final class GameSession {
         roomContent.update(navigation.getCurrentRoom(), player);
         attackSystem.update(dt, navigation);
         enemies.update(dt, player, attackSystem, navigation);
+        // 首领起手召唤时给一条即时提示：裂隙本身画在地上，但玩家常常正盯着首领看。
+        if (enemies.consumeSummonCalls() > 0) {
+            roomAnnouncement = "守望者撕开裂隙 · 召唤增援";
+            roomAnnouncementRemaining = 2.0;
+        }
         int kills = enemies.consumeKills();
         Room current = navigation.getCurrentRoom();
         if (current.type() == RoomType.BATTLE || current.type() == RoomType.BOSS
@@ -191,6 +197,12 @@ public final class GameSession {
 
     /** 守望者裂隙闪现的视觉残留；没有时返回 null。 */
     public EnemySystem.BlinkFlash getBlinkFlash() { return enemies.getBlinkFlash(); }
+
+    /** 首领召唤裂隙（还没放出召唤物的预警圈）：渲染层画在角色之下。 */
+    public List<SummonRift> getSummonRifts() { return enemies.getSummonRifts(); }
+
+    /** 场上还活着的首领召唤物数量。 */
+    public int getSummonedCount() { return enemies.getSummonedCount(); }
 
     /** 当前房间地面上的拾取物：挂在房间上，所以离开再回来东西还在。 */
     public List<Pickup> getPickups() { return navigation.getCurrentRoom().loot().pickupsView(); }

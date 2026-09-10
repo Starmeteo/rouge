@@ -13,6 +13,7 @@ import com.phantomcorridor.model.combat.Projectile;
 import com.phantomcorridor.model.combat.EnemyAttack;
 import com.phantomcorridor.model.combat.EnemyVisualEffect;
 import com.phantomcorridor.model.combat.EnemyProjectile;
+import com.phantomcorridor.model.combat.SummonRift;
 import com.phantomcorridor.model.entity.Enemy;
 import com.phantomcorridor.model.entity.EnemyKind;
 import com.phantomcorridor.model.room.Direction;
@@ -71,6 +72,7 @@ public final class GameRenderer {
         drawRoom(g, session, light);
         drawPhaseWalls(g, session, light);
         drawBlinkFlash(g, session);
+        drawSummonRifts(g, session, player.getCurrentWorld());
         drawEnemies(g, session, player.getCurrentWorld());
         drawEnemyAttacks(g, session, player.getCurrentWorld());
         drawPortal(g, session);
@@ -172,6 +174,57 @@ public final class GameRenderer {
         g.setStroke(Color.color(1.0, 0.95, 0.75, alpha * 0.9));
         g.setLineWidth(1.6);
         g.strokeOval(x - radius * 0.62, y - radius * 0.42, radius * 1.24, radius * 0.84);
+    }
+
+    /**
+     * 首领的召唤裂隙：一圈收缩的预警圈 + 正在张开的传送门。
+     *
+     * <p>预警是这段机制的核心——召唤物落地前玩家必须看得见“哪里要出怪、还剩多久”，
+     * 否则召唤就只是凭空多出来两只怪。素材包为这个用途准备了 spawn_circle 预警图，
+     * 这里再叠一道几何收缩环：素材缺失或裁切异常时预警依然成立。
+     */
+    private void drawSummonRifts(GraphicsContext g, GameSession session, WorldType currentWorld) {
+        for (SummonRift rift : session.getSummonRifts()) {
+            if (rift.world() != currentWorld) continue;
+            double progress = rift.progress();
+            String form = currentWorld == WorldType.LIGHT ? "light" : "shadow";
+            double size = 150.0 + 60.0 * progress;
+            Image telegraph = animationFrame(telegraphFrames(form, "spawn_circle"),
+                    rift.age(), rift.duration(), false, 4.0);
+            if (telegraph != null) {
+                g.save();
+                g.setGlobalAlpha(0.34 + 0.5 * progress);
+                g.drawImage(telegraph, rift.x() - size / 2.0, rift.y() - size / 2.0, size, size);
+                g.restore();
+            }
+            drawMonsterEffect(g, EnemyKind.WATCHER, rift.world(), "summon_portal", rift.x(), rift.y(),
+                    0.0, 120.0 + 110.0 * progress, rift.age(), rift.duration());
+            // 预警素材那 4 帧只是把 r=100/128 的圈逐渐点亮、加粗，本身不会收缩；
+            // 这里再补一道从预警圈收拢到孔隙的环，让“还要多久出怪”一眼可见。
+            Color ring = currentWorld == WorldType.LIGHT ? LIGHT_GOLD : SHADOW_VIOLET;
+            double warningRadius = size * 0.39;
+            double radius = warningRadius * (1.0 - progress) + 26.0;
+            g.setStroke(Color.color(ring.getRed(), ring.getGreen(), ring.getBlue(), 0.35 + 0.5 * progress));
+            g.setLineWidth(3.0);
+            g.strokeOval(rift.x() - radius, rift.y() - radius * 0.62, radius * 2.0, radius * 1.24);
+        }
+    }
+
+    /** 几何预警图：4 帧、256×256、锚点在正中（见 enemies/telegraphs.json）。 */
+    private static Image[] telegraphFrames(String form, String shape) {
+        String key = "telegraphs/" + form + "/" + shape;
+        Image[] cached = MONSTER_FRAME_SETS.get(key);
+        if (cached != null) return cached;
+        List<Image> frames = new ArrayList<>();
+        for (int i = 1; i <= 4; i++) {
+            var resource = GameRenderer.class.getResource("/com/phantomcorridor/enemies/telegraphs/" + form
+                    + "/" + shape + "/" + String.format("%02d", i) + ".png");
+            if (resource == null) break;
+            frames.add(new Image(resource.toExternalForm(), false));
+        }
+        Image[] result = frames.toArray(Image[]::new);
+        MONSTER_FRAME_SETS.put(key, result);
+        return result;
     }
 
     /** 非当前世界的敌人及攻击完全不绘制，与模型的同界碰撞规则保持一致。 */

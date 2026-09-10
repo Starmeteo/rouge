@@ -137,6 +137,61 @@ public final class GameConfig {
     /** 裂隙特效的显示时间（秒）。 */
     public static final double WATCHER_BLINK_FLASH_TIME = 0.55;
 
+    // ---- 守望者的召唤（Boss 战增援） ----
+    /**
+     * 单次召唤开出的裂隙数量。
+     *
+     * <p>与 {@link #WATCHER_SUMMON_MAX_ALIVE} 一起卡住场面：一次最多两只，
+     * 场上最多四只，清掉之后才会再来一波。
+     */
+    public static final int WATCHER_SUMMON_COUNT = 2;
+
+    /** 场上同时存在的召唤物上限（含还没成型的裂隙）：满了就先等玩家清场。 */
+    public static final int WATCHER_SUMMON_MAX_ALIVE = 4;
+
+    /** 两次召唤之间的冷却（秒）；血量阶段召唤不受它限制。 */
+    public static final double WATCHER_SUMMON_COOLDOWN = 12.0;
+
+    /**
+     * 开场先让玩家与首领单挑这么久（秒），之后才允许第一次增援召唤。
+     *
+     * <p>没有这段缓冲，首领一进房就拉着四只小怪一起扑上来，玩家连它的招式都看不清。
+     */
+    public static final double WATCHER_SUMMON_OPENING_DELAY = 6.0;
+
+    /**
+     * 连续这么久打不到玩家（没有开火视线）就把增援喊出来，把玩家从掩体后面逼出来。
+     *
+     * <p>小怪身位小、跑得快，能挤进首领自己进不去的缝隙——这正是召唤存在的意义。
+     */
+    public static final double WATCHER_SUMMON_PRESSURE_TIME = 5.0;
+
+    /** 裂隙成型时间（秒）：这段时间就是给玩家看的预警窗口。 */
+    public static final double WATCHER_SUMMON_RIFT_TIME = 1.2;
+
+    /** 裂隙离首领的距离范围（像素）。 */
+    public static final double WATCHER_SUMMON_RIFT_MIN_DISTANCE = 130.0;
+
+    /** 裂隙离首领的最大距离（像素）。 */
+    public static final double WATCHER_SUMMON_RIFT_MAX_DISTANCE = 250.0;
+
+    /** 两个裂隙之间的最小间距（像素）：避免两只召唤物叠在同一个点上。 */
+    public static final double WATCHER_SUMMON_RIFT_SPACING = 110.0;
+
+    /** 裂隙离玩家的最小距离（像素）：召唤物不许直接压在玩家头上出生。 */
+    public static final double WATCHER_SUMMON_PLAYER_CLEARANCE = 140.0;
+
+    /**
+     * 召唤物的生命倍率。
+     *
+     * <p>召唤物照样吃层数成长与难度倍率，但比同层的房间怪更脆：
+     * 四只一起上时玩家还打得动，否则“清小怪”会变成比打首领更累的活。
+     */
+    public static final double WATCHER_SUMMON_HP_SCALE = 0.7;
+
+    /** 召唤物成型后的起手时间（秒）：刚钻出裂隙不会立刻贴脸开火。 */
+    public static final double WATCHER_SUMMON_ALERT = 0.8;
+
     public static final double ENEMY_PROJECTILE_SPEED = 190.0;
 
     /**

@@ -212,7 +212,12 @@ class EnemySystemTest {
                 PlayerAttackSystem playerAttacks = new PlayerAttackSystem();
                 for (int frame = 0; frame < 30 * 60; frame++) {
                     system.update(DT, player, playerAttacks, navigation);
-                    system.getAttacks().forEach(attack -> kindsThatFired.add(attack.getSource()));
+                    // 只统计开局就在场的这几种敌人：首领中途会召唤增援，召唤物的攻击不该被算成
+                    // “开局的敌人参战了”。战斗房不会召唤，首领房开局的种类是 WATCHER，
+                    // 而召唤出来的只会是灯灵/影狼/法师，不会和开局的种类撞车。
+                    system.getAttacks().stream()
+                            .filter(attack -> kindsInPlayerWorld.contains(attack.getSource()))
+                            .forEach(attack -> kindsThatFired.add(attack.getSource()));
                     for (Enemy enemy : sameWorldEnemies) {
                         closestDistances.merge(enemy, distance(player, enemy), Math::min);
                     }

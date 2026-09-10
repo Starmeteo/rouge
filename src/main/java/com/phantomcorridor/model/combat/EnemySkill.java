@@ -30,9 +30,15 @@ public enum EnemySkill {
     WATCHER_BARRAGE(EnemyKind.WATCHER, WorldType.LIGHT, "attack", "sun_pellet", Pattern.DOUBLE_RING, .90, 1.05, 540, 13, 16, 205, 3.10),
     WATCHER_JUDGMENT(EnemyKind.WATCHER, WorldType.LIGHT, "judgment", "pillar_impact", Pattern.TRIPLE_MARK, 1.05, 1.10, 580, 82, 3, 0, 3.35),
     WATCHER_SPEAR(EnemyKind.WATCHER, WorldType.LIGHT, "rift_spear", "rift_spear", Pattern.PROJECTILE, 1.10, 1.15, 610, 20, 1, 350, 3.55),
+    /**
+     * 光界的增援召唤：素材包里守望者的光形态没有 summon_* 本体动作，
+     * 这里用它的 transform（相位收拢）配合两侧都有的 summon_portal 特效，
+     * 读起来就是“把光界的造物从裂隙里拉出来”。
+     */
+    WATCHER_CALL(EnemyKind.WATCHER, WorldType.LIGHT, "transform", "summon_portal", Pattern.SUMMON, 1.15, 1.40, 620, 0, 2, 0, 12.0),
     WATCHER_DOUBLE_SLASH(EnemyKind.WATCHER, WorldType.SHADOW, "attack", "slash_arc", Pattern.DOUBLE_ARC, .85, 1.20, 235, 155, 1, 0, 3.15),
     WATCHER_DASH(EnemyKind.WATCHER, WorldType.SHADOW, "dash", "dash_trail", Pattern.DASH, .85, 1.20, 470, 92, 1, 0, 3.05),
-    WATCHER_SUMMON(EnemyKind.WATCHER, WorldType.SHADOW, "summon", "summon_portal", Pattern.SUMMON, 1.10, 1.40, 540, 0, 1, 0, 5.40);
+    WATCHER_SUMMON(EnemyKind.WATCHER, WorldType.SHADOW, "summon", "summon_portal", Pattern.SUMMON, 1.20, 1.50, 540, 0, 2, 0, 12.0);
 
     public enum Pattern { PROJECTILE, SPREAD, FAN, RING, DOUBLE_RING, ARC, DOUBLE_ARC, DASH, DASH_NO_DAMAGE, CRACK, MARK, TRIPLE_MARK, RING_AREA, SUMMON }
 
