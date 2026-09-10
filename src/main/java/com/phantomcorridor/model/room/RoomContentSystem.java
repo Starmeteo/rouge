@@ -57,8 +57,12 @@ public final class RoomContentSystem {
         loot.markRolled();
         switch (room.type()) {
             case REWARD -> {
-                loot.addPickup(new Pickup(Pickup.Type.COIN, player.getX() + 36, player.getY(), 5));
-                loot.addPickup(new Pickup(Pickup.Type.EQUIPMENT, player.getX() - 36, player.getY(),
+                // 奖励不再跟随玩家刚进门的位置：以房间几何中心为原点摆放成一个小组，
+                // 不规则房间也能稳定落在主区域中央。
+                double x = centerX(room);
+                double y = centerY(room);
+                loot.addPickup(new Pickup(Pickup.Type.COIN, x + 28, y, 5));
+                loot.addPickup(new Pickup(Pickup.Type.EQUIPMENT, x - 28, y,
                         equipmentIndex(room, 1)));
             }
             case SHOP -> {

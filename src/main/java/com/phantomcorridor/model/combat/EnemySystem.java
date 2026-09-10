@@ -191,7 +191,7 @@ public final class EnemySystem {
                 if (lineOfSight) enemy.resetSummonPressure();
                 else enemy.addSummonPressure(dt);
             }
-            if (beginSummonIfDue(enemy, player)) continue;
+            if (beginSummonIfDue(enemy, player, distance, lineOfSight)) continue;
             if (lineOfSight && enemy.canAttack()) beginCast(enemy, player, chooseSkill(enemy, distance));
         }
         // 首领一倒、或它跨界离开，它的造物与还没成型的裂隙一起溃散：
@@ -349,7 +349,7 @@ public final class EnemySystem {
             for (Enemy enemy : enemies) {
                 if (!enemy.isDead() && projectile.getWorld() == enemy.getWorld()
                         && CollisionUtil.circleIntersectsCircle(projectile.getX(), projectile.getY(), projectile.getRadius(),
-                        enemy.getX(), enemy.getY(), enemyRadius(enemy))) {
+                        enemy.getHitboxCenterX(), enemy.getHitboxCenterY(), enemy.getHitboxRadius())) {
                     enemy.takeHit(player.getAttackDamage());
                     projectile.expire();
                     break;
@@ -360,8 +360,8 @@ public final class EnemySystem {
             int attackId = playerAttacks.getMeleeAttackId();
             for (Enemy enemy : enemies) {
                 if (enemy.getWorld() != WorldType.SHADOW || enemy.getLastMeleeHitId() == attackId) continue;
-                if (Math.hypot(enemy.getX() - player.getX(), enemy.getY() - player.getY())
-                        <= GameConfig.SHADOW_MELEE_RANGE + enemyRadius(enemy)) {
+                if (Math.hypot(enemy.getHitboxCenterX() - player.getX(), enemy.getHitboxCenterY() - player.getY())
+                        <= GameConfig.SHADOW_MELEE_RANGE + enemy.getHitboxRadius()) {
                     enemy.takeHit(player.getAttackDamage());
                     enemy.setLastMeleeHitId(attackId);
                 }
@@ -543,6 +543,10 @@ public final class EnemySystem {
     /** 攻击严格按“前摇 → 出招（只触发一次释放）→ 收招”播放，逻辑事件不依赖渲染帧。 */
     private void startCast(Enemy enemy, Player player, EnemySkill skill) {
         double dx = player.getX() - enemy.getX(), dy = player.getY() - enemy.getY();
+        if (enemy.isBoss()) {
+            if (skill.pattern() == EnemySkill.Pattern.SUMMON) enemy.resetNormalCastsSinceSummon();
+            else enemy.recordNormalCast();
+        }
         enemy.setFacingFromVector(dx, dy);
         enemy.playAnimation(skill.actionBase() + "_windup", skill.windup(), false);
         activeCasts.put(enemy, new ActiveCast(skill, Math.atan2(dy, dx), player.getX(), player.getY()));
@@ -571,14 +575,23 @@ public final class EnemySystem {
      *
      * @return 本帧是否已经起手召唤（起手后不再走普通攻击）
      */
-    private boolean beginSummonIfDue(Enemy boss, Player player) {
+    private boolean beginSummonIfDue(Enemy boss, Player player, double distance, boolean lineOfSight) {
         if (!boss.isBoss() || activeCasts.containsKey(boss)) return false;
         int load = summonLoad();
         if (load >= GameConfig.WATCHER_SUMMON_MAX_ALIVE) return false;
         boolean stageDue = boss.getSummonStage() < SUMMON_STAGE_HP.length
                 && boss.getHp() <= boss.getMaxHp() * SUMMON_STAGE_HP[boss.getSummonStage()];
         boolean pressureDue = boss.getSummonPressure() >= GameConfig.WATCHER_SUMMON_PRESSURE_TIME;
-        boolean reinforcementDue = load == 0;
+        // 160px 已进入首领模型边缘与玩家近战的交错距离；在这个距离内强制本体攻击。
+        // 仍略小于守望者 190px 的远程站位，保证它在中距离能正常使用新的召唤机制。
+        boolean playerIsClose = lineOfSight && distance <= 160.0;
+        // 玩家已经贴近首领时，补位增援不应抢走本体攻击；血量阶段/地形困住仍可触发一次，
+        // 这样新机制存在感足够，又不会造成“Boss 只会叫小怪”的体验。
+        if (playerIsClose && !stageDue && !pressureDue) return false;
+        // 补位不会立刻抢走原本的普攻轮换。首领在每波增援前至少会完整施放两次本体技能，
+        // 所以旧有弹幕/审判/长矛（影界的连斩/冲刺）始终可见；血量阶段与被地形困住时
+        // 仍可无视该限制召唤，保留新机制的压迫感。
+        boolean reinforcementDue = !playerIsClose && load == 0 && boss.getNormalCastsSinceSummon() >= 2;
         if (!stageDue && !pressureDue && !reinforcementDue) return false;
         if (!stageDue && boss.getSummonCooldown() > 0.0) return false;
         EnemySkill summon = EnemySkill.forEnemy(EnemyKind.WATCHER, boss.getWorld()).stream()
@@ -725,23 +738,24 @@ public final class EnemySystem {
             case RING -> radial(enemy, skill, 9, cast.angle + Math.PI / 4.0);
             case DOUBLE_RING -> radial(enemy, skill, 16, cast.angle);
             case ARC -> area(enemy, skill, enemy.getX() + Math.cos(cast.angle) * skill.radius() * .48,
-                    enemy.getY() + Math.sin(cast.angle) * skill.radius() * .48, .12, 0.0);
+                    enemy.getY() + Math.sin(cast.angle) * skill.radius() * .48, cast.angle, .12, 0.0);
             case DOUBLE_ARC -> {
                 area(enemy, skill, enemy.getX() + Math.cos(cast.angle) * skill.radius() * .48,
-                        enemy.getY() + Math.sin(cast.angle) * skill.radius() * .48, .12, 0.0);
+                        enemy.getY() + Math.sin(cast.angle) * skill.radius() * .48, cast.angle, .12, 0.0);
                 area(enemy, skill, enemy.getX() + Math.cos(cast.angle) * skill.radius() * .55,
-                        enemy.getY() + Math.sin(cast.angle) * skill.radius() * .55, .12, .45);
+                        enemy.getY() + Math.sin(cast.angle) * skill.radius() * .55, cast.angle, .12, .45);
             }
             case CRACK -> {
                 for (int i = 1; i <= 3; i++) area(enemy, skill,
                         enemy.getX() + Math.cos(cast.angle) * 65 * i,
-                        enemy.getY() + Math.sin(cast.angle) * 65 * i, .15, .18 * (i - 1));
+                        enemy.getY() + Math.sin(cast.angle) * 65 * i, cast.angle, .15, .18 * (i - 1));
             }
-            case MARK -> area(enemy, skill, cast.targetX, cast.targetY, .16, .36);
+            case MARK -> area(enemy, skill, cast.targetX, cast.targetY, cast.angle, .16, .36);
             case TRIPLE_MARK -> {
                 for (int i = -1; i <= 1; i++) area(enemy, skill,
                         cast.targetX + Math.cos(cast.angle + Math.PI / 2.0) * i * 74,
-                        cast.targetY + Math.sin(cast.angle + Math.PI / 2.0) * i * 74, .16, .30 + .22 * (i + 1));
+                        cast.targetY + Math.sin(cast.angle + Math.PI / 2.0) * i * 74,
+                        cast.angle, .16, .30 + .22 * (i + 1));
             }
             case RING_AREA -> radial(enemy, skill, 9, cast.angle);
             case DASH, DASH_NO_DAMAGE -> dash(enemy, skill, cast.angle, navigation);
@@ -759,9 +773,11 @@ public final class EnemySystem {
     private void radial(Enemy enemy, EnemySkill skill, int count, double offset) {
         for (int i = 0; i < count; i++) projectile(enemy, skill, offset + Math.PI * 2 * i / count);
     }
-    private void area(Enemy enemy, EnemySkill skill, double x, double y, double duration, double delay) {
+    /** 静态范围攻击也要保存瞄准角度，独立攻击特效才能与实际出招方向一致。 */
+    private void area(Enemy enemy, EnemySkill skill, double x, double y, double angle,
+                      double duration, double delay) {
         attacks.add(new EnemyAttack(x, y, 0, 0, skill.radius(), enemy.getWorld(), enemy.getKind(), duration,
-                skill.effect(), 0.0, delay));
+                skill.effect(), angle, delay));
     }
     private void dash(Enemy enemy, EnemySkill skill, double angle, RoomNavigationSystem navigation) {
         double distance = skill.kind() == EnemyKind.WATCHER ? 260 : 170;
@@ -770,7 +786,9 @@ public final class EnemySystem {
                 && navigation.canOccupy(nx, ny, enemyRadius(enemy), enemy.getWorld())) enemy.setPosition(nx, ny);
         // 冲刺抵达后保留一个短暂、可见的落点判定帧；既能给命中效果留出播放时间，
         // 也不会因“生成即撞到玩家、同一逻辑帧删除”而让攻击在渲染层完全看不见。
-        if (skill.pattern() == EnemySkill.Pattern.DASH) area(enemy, skill, enemy.getX(), enemy.getY(), .15, .05);
+        if (skill.pattern() == EnemySkill.Pattern.DASH) {
+            area(enemy, skill, enemy.getX(), enemy.getY(), angle, .15, .05);
+        }
     }
     /**
      * 打开召唤裂隙：不直接生成召唤物，只在预定落点留下几道正在成型的裂隙。
@@ -895,6 +913,7 @@ public final class EnemySystem {
             case MAGE -> 185.0;
             case BELL -> 190.0;
             // 首领远程技射程很远，但不能把安全站位拉得过大；否则在中距离会显得原地发呆。
+            // 守望者停在普通远程站位；玩家主动贴脸时由上面的近身优先规则强制它直接出招。
             case WATCHER -> 190.0;
             case WOLF -> 78.0;
             case GOLEM -> 96.0;

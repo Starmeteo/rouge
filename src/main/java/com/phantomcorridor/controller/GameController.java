@@ -6,6 +6,7 @@ import com.phantomcorridor.view.GameView;
 import javafx.scene.input.KeyCode;
 import com.phantomcorridor.config.AppConfig;
 import com.phantomcorridor.config.Settings;
+import java.util.function.Consumer;
 
 /** 游戏输入、模型更新和渲染调度。 */
 public final class GameController {
@@ -23,20 +24,29 @@ public final class GameController {
     private double aimY;
     private final Settings settings;
     private final Runnable onMainMenu;
+    private final Consumer<GameSession> onSessionUpdated;
 
     public GameController(GameView view, Runnable onPauseRequested, Settings settings) {
-        this(view, onPauseRequested, settings, () -> { });
+        this(view, onPauseRequested, settings, () -> { }, session -> { });
     }
 
     public GameController(GameView view, Runnable onPauseRequested, Settings settings, Runnable onMainMenu) {
+        this(view, onPauseRequested, settings, onMainMenu, session -> { });
+    }
+
+    /** @param onSessionUpdated 用于同步音乐等只读的表现层状态。 */
+    public GameController(GameView view, Runnable onPauseRequested, Settings settings, Runnable onMainMenu,
+                          Consumer<GameSession> onSessionUpdated) {
         this.view = view;
         this.onPauseRequested = onPauseRequested;
         this.settings = settings;
         this.onMainMenu = onMainMenu;
+        this.onSessionUpdated = onSessionUpdated == null ? session -> { } : onSessionUpdated;
         this.loop = new GameLoop() {
             @Override
             protected void update(double dt) {
                 session.update(dt, input.horizontal(), input.vertical(), aimX, aimY, attackHeld);
+                GameController.this.onSessionUpdated.accept(session);
             }
             @Override
             protected void render(double frameDelta) {
@@ -58,6 +68,7 @@ public final class GameController {
         attackHeld = false;
         aimX = session.getPlayer().getX() + 1.0;
         aimY = session.getPlayer().getY();
+        onSessionUpdated.accept(session);
         view.render(session, 0.0);
     }
 
