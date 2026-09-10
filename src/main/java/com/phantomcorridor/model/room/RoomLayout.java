@@ -12,6 +12,19 @@ public record RoomLayout(RoomShape shape, List<RoomArea> areas, List<Wall> walls
     private static final double CENTER_X = 640;
     private static final double CENTER_Y = 480;
 
+    /** 普通房间：障碍物离房间边缘的距离与障碍物之间的最小缝隙（像素）。 */
+    private static final double OBSTACLE_CLEARANCE = 96;
+    private static final double OBSTACLE_GAP = 28;
+
+    /**
+     * 首领房专用：障碍物离边缘更远、彼此间隔更宽。
+     *
+     * <p>首领身位直径 92，外圈通道必须宽到寻路网格采得到（40 像素格），
+     * 否则它的距离场会把外圈判成不可达，玩家就能把它顶在墙角。
+     */
+    private static final double BOSS_CLEARANCE = 144;
+    private static final double BOSS_GAP = 112;
+
     public RoomLayout {
         areas = List.copyOf(areas);
         walls = List.copyOf(walls);
@@ -32,7 +45,12 @@ public record RoomLayout(RoomShape shape, List<RoomArea> areas, List<Wall> walls
             case BOSS -> 3 + random.nextInt(3);
             default -> 3 + random.nextInt(5);
         };
-        return new RoomLayout(shape, areas, createObstacles(areas, obstacleCount, random));
+        // 首领身位半径 46（直径 92），障碍物必须让出更宽的通道：
+        // 离房间边缘 96 像素时，外侧只剩 4 像素的余量，寻路用的 40 像素网格根本采不到那一圈，
+        // 首领的距离场就会把外圈判成不可达——于是它正好被玩家顶在墙角磨死。
+        double clearance = type == RoomType.BOSS ? BOSS_CLEARANCE : OBSTACLE_CLEARANCE;
+        double gap = type == RoomType.BOSS ? BOSS_GAP : OBSTACLE_GAP;
+        return new RoomLayout(shape, areas, createObstacles(areas, obstacleCount, random, clearance, gap));
     }
 
     private static RoomShape chooseShape(RoomType type, Random random) {
@@ -71,7 +89,8 @@ public record RoomLayout(RoomShape shape, List<RoomArea> areas, List<Wall> walls
         };
     }
 
-    private static List<Wall> createObstacles(List<RoomArea> areas, int count, Random random) {
+    private static List<Wall> createObstacles(List<RoomArea> areas, int count, Random random,
+                                              double clearance, double gap) {
         List<Wall> walls = new ArrayList<>();
         RoomArea primary = areas.getFirst();
         int attempts = 0;
@@ -82,22 +101,26 @@ public record RoomLayout(RoomShape shape, List<RoomArea> areas, List<Wall> walls
             if (!pillar && random.nextBoolean()) {
                 double swap = width; width = height; height = swap;
             }
-            double x = primary.x() + 112 + random.nextDouble() * Math.max(1, primary.width() - width - 224);
-            double y = primary.y() + 112 + random.nextDouble() * Math.max(1, primary.height() - height - 224);
+            double x = primary.x() + clearance
+                    + random.nextDouble() * Math.max(1, primary.width() - width - clearance * 2);
+            double y = primary.y() + clearance
+                    + random.nextDouble() * Math.max(1, primary.height() - height - clearance * 2);
             double cx = x + width / 2, cy = y + height / 2;
             // 门口保留完整通道，墙边保留角色半径+缓冲，避免生成不可进入的窄缝。
             boolean nearDoor = (Math.abs(cx - CENTER_X) < 96 && (Math.abs(cy - primary.y()) < 128
                     || Math.abs(cy - (primary.y() + primary.height())) < 128))
                     || (Math.abs(cy - CENTER_Y) < 96 && (Math.abs(cx - primary.x()) < 128
                     || Math.abs(cx - (primary.x() + primary.width())) < 128));
-            if (nearDoor || x < primary.x() + 96 || y < primary.y() + 96
-                    || x + width > primary.x() + primary.width() - 96
-                    || y + height > primary.y() + primary.height() - 96) continue;
+            if (nearDoor || x < primary.x() + clearance || y < primary.y() + clearance
+                    || x + width > primary.x() + primary.width() - clearance
+                    || y + height > primary.y() + primary.height() - clearance) continue;
             final double candidateX = x, candidateY = y;
             final double candidateWidth = width, candidateHeight = height;
+            // gap 决定两块障碍之间留多宽的缝：普通房留 28 像素就够玩家侧身，
+            // 首领房要留得下首领的直径，否则它会卡在两块石头中间。
             boolean overlaps = walls.stream().anyMatch(w ->
-                    candidateX < w.x() + w.width() + 28 && candidateX + candidateWidth + 28 > w.x()
-                            && candidateY < w.y() + w.height() + 28 && candidateY + candidateHeight + 28 > w.y());
+                    candidateX < w.x() + w.width() + gap && candidateX + candidateWidth + gap > w.x()
+                            && candidateY < w.y() + w.height() + gap && candidateY + candidateHeight + gap > w.y());
             if (overlaps) continue;
             WorldType world = switch (random.nextInt(3)) {
                 case 0 -> WorldType.LIGHT;

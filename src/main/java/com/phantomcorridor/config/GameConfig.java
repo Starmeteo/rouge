@@ -102,6 +102,41 @@ public final class GameConfig {
      */
     public static final double ENEMY_AVOIDANCE_MIN_TURN_COSINE = -0.1;
 
+    // ---- 敌人脱困（防止被玩家贴在墙上磨死） ----
+    /** 连续这么久没能更接近玩家，就视为被墙卡死并触发脱困。 */
+    public static final double ENEMY_STUCK_TIME = 2.0;
+
+    /** 判定“确实更接近了”所需的最小进步距离（像素）。 */
+    public static final double ENEMY_STUCK_PROGRESS_STEP = 10.0;
+
+    /** 判定“还在移动”所需的最小位移（像素/窗口）：正在绕路的敌人不该被当成卡死。 */
+    public static final double ENEMY_STUCK_MOVE_STEP = 64.0;
+
+    /** 脱困时向外搜索合法落点的最大半径（像素）。 */
+    public static final double ENEMY_ESCAPE_SEARCH_RADIUS = 220.0;
+
+    /** 脱困搜索的逐圈步长（像素）。 */
+    public static final double ENEMY_ESCAPE_SEARCH_STEP = 16.0;
+
+    // ---- 守望者的裂隙闪现（追不上就穿过裂隙贴到玩家附近） ----
+    /** 落点离玩家的最近距离（像素）：不要直接叠在玩家身上。 */
+    public static final double WATCHER_BLINK_MIN_DISTANCE = 150.0;
+
+    /** 在玩家周围搜索落点的最大半径（像素）。 */
+    public static final double WATCHER_BLINK_SEARCH_RADIUS = 420.0;
+
+    /** 单次闪现的最大位移（像素）：设定上是“短距”。 */
+    public static final double WATCHER_BLINK_RANGE = 560.0;
+
+    /** 闪现落地后的起手时间（秒）：给玩家一个反应窗口，避免贴脸瞬狙。 */
+    public static final double WATCHER_BLINK_WINDUP = 0.9;
+
+    /** 两次闪现之间的冷却（秒）：卡住也不会连闪。 */
+    public static final double WATCHER_BLINK_COOLDOWN = 4.0;
+
+    /** 裂隙特效的显示时间（秒）。 */
+    public static final double WATCHER_BLINK_FLASH_TIME = 0.55;
+
     public static final double ENEMY_PROJECTILE_SPEED = 190.0;
 
     /**
@@ -149,6 +184,22 @@ public final class GameConfig {
 
     /** 切界脉冲圆环的显示时间。 */
     public static final double PHASE_PULSE_VISIBLE_TIME = 0.32;
+
+    // ---- 第 8 天：五层推进 ----
+    /** 一局的总层数：打通最后一层的首领并走进传送门即通关。 */
+    public static final int TOTAL_FLOORS = 5;
+
+    /** 敌人生命值随层数的增长倍率：第 N 层为基础值的 {@code 1 + (N-1) * 该值} 倍。 */
+    public static final double ENEMY_HP_GROWTH_PER_FLOOR = 0.25;
+
+    /** 敌人防御（每次受击减免的伤害）随层数的增量。 */
+    public static final int ENEMY_DEFENSE_PER_FLOOR = 1;
+
+    /** 敌人防御上限：留出上限，避免高层的普通敌人硬到普通攻击打不动。 */
+    public static final int ENEMY_DEFENSE_MAX = 3;
+
+    /** 每层地图种子相对上一层的偏移：同一个种子下每层地图可复现、但互不相同。 */
+    public static final long FLOOR_SEED_STEP = 7919L;
 
     // ---- 第 7 天：房间内容与商店 ----
     /** 玩家与拾取物/宝箱/事件的交互距离（像素）：提示与实际生效共用同一半径。 */

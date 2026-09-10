@@ -22,7 +22,7 @@ class RoomContentSystemTest {
         Room shop = openRoom(3, RoomType.SHOP);
         Player player = new Player(640, 480);
         RoomContentSystem content = new RoomContentSystem();
-        content.reset(42L);
+        content.reset(42L, 1);
 
         content.enterRoom(shop, player);
         assertEquals(GameConfig.SHOP_OFFER_COUNT, shop.loot().pickups().size(), "商店应当上架固定件数的商品");
@@ -40,7 +40,7 @@ class RoomContentSystemTest {
         Room shop = openRoom(3, RoomType.SHOP);
         Player player = new Player(640, 480);
         RoomContentSystem content = new RoomContentSystem();
-        content.reset(42L);
+        content.reset(42L, 1);
         content.enterRoom(shop, player);
 
         List<Pickup> offers = shop.loot().pickups();
@@ -61,7 +61,7 @@ class RoomContentSystemTest {
         Room shop = openRoom(3, RoomType.SHOP);
         Player player = new Player(640, 480);
         RoomContentSystem content = new RoomContentSystem();
-        content.reset(42L);
+        content.reset(42L, 1);
         content.enterRoom(shop, player);
         Pickup offer = nearestOffer(shop, player);
         int price = RoomContentSystem.priceOf(offer);
@@ -99,7 +99,7 @@ class RoomContentSystemTest {
         Room shop = openRoom(3, RoomType.SHOP);
         Player player = new Player(640, 480);
         RoomContentSystem content = new RoomContentSystem();
-        content.reset(42L);
+        content.reset(42L, 1);
         content.enterRoom(shop, player);
         Pickup offer = nearestOffer(shop, player);
         int price = RoomContentSystem.priceOf(offer);
@@ -119,7 +119,7 @@ class RoomContentSystemTest {
         Room shop = openRoom(3, RoomType.SHOP);
         Player player = new Player(640, 480);
         RoomContentSystem content = new RoomContentSystem();
-        content.reset(42L);
+        content.reset(42L, 1);
         content.enterRoom(shop, player);
         Pickup offer = nearestOffer(shop, player);
         player.addCoins(200);
@@ -140,7 +140,7 @@ class RoomContentSystemTest {
         Player player = new Player(battle.doorCenter(Direction.NORTH),
                 battle.minY() + RoomConfig.CHEST_OFFSET_Y);
         RoomContentSystem content = new RoomContentSystem();
-        content.reset(11L);
+        content.reset(11L, 1);
 
         assertTrue(battle.hasUnopenedChest());
         assertTrue(battle.hasRemainingLoot(), "没开的宝箱算作房间还有东西可拿");
@@ -176,7 +176,7 @@ class RoomContentSystemTest {
         Room room = openRoom(2, RoomType.REWARD);
         Player player = new Player(600, 480);
         RoomContentSystem content = new RoomContentSystem();
-        content.reset(5L);
+        content.reset(5L, 1);
         room.loot().addPickup(new Pickup(Pickup.Type.HEALTH, 610, 480, 2));
 
         assertEquals("E  拾取 生命恢复药剂", content.prompt(room, player));
@@ -193,7 +193,7 @@ class RoomContentSystemTest {
         Room room = openRoom(2, RoomType.REWARD);
         Player player = new Player(600, 480);
         RoomContentSystem content = new RoomContentSystem();
-        content.reset(5L);
+        content.reset(5L, 1);
         Pickup equipment = new Pickup(Pickup.Type.EQUIPMENT, 610, 480, 1);
         room.loot().addPickup(equipment);
 
@@ -205,7 +205,7 @@ class RoomContentSystemTest {
         Room shop = openRoom(3, RoomType.SHOP);
         Player player = new Player(640, 480);
         RoomContentSystem content = new RoomContentSystem();
-        content.reset(42L);
+        content.reset(42L, 1);
         content.enterRoom(shop, player);
         Pickup offer = nearestOffer(shop, player);
         int price = RoomContentSystem.priceOf(offer);

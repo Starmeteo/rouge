@@ -43,6 +43,23 @@ public final class RoomFlowField {
 
     public int roomId() { return roomId; }
 
+    public int columns() { return columns; }
+
+    public int rows() { return rows; }
+
+    /** 第 column 列格心的 X 坐标（调试与寻路诊断用）。 */
+    public double centerOfColumn(int column) { return centerX(column); }
+
+    /** 第 row 行格心的 Y 坐标（调试与寻路诊断用）。 */
+    public double centerOfRow(int row) { return centerY(row); }
+
+    /** 该点所在格是否与玩家连通（不可达说明这一块和玩家之间没有可走的路）。 */
+    public boolean isReachable(double x, double y) {
+        int column = Math.min(columns - 1, Math.max(0, columnOf(x)));
+        int row = Math.min(rows - 1, Math.max(0, rowOf(y)));
+        return steps[index(column, row)] != UNREACHABLE;
+    }
+
     /** 距离场是否已经以给定坐标所在格为目标；为 false 时需要调用 {@link #rebuild}。 */
     public boolean isTargeting(double x, double y) {
         return targetColumn == columnOf(x) && targetRow == rowOf(y);

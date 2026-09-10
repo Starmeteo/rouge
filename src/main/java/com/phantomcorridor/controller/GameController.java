@@ -79,7 +79,8 @@ public final class GameController {
     }
 
     private void keyPressed(KeyCode key) {
-        if (session.getPlayer().getHp() <= 0) {
+        // 死亡或通关后只保留重开与返回主菜单。
+        if (session.getPlayer().getHp() <= 0 || session.isRunCleared()) {
             if (key == KeyCode.R) newRun();
             else if (key == KeyCode.M) onMainMenu.run();
             return;
