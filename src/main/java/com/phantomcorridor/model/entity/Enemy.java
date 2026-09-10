@@ -1,6 +1,7 @@
 package com.phantomcorridor.model.entity;
 
 import com.phantomcorridor.config.GameConfig;
+import com.phantomcorridor.model.Difficulty;
 import com.phantomcorridor.model.WorldType;
 
 /** 纯运行时敌人模型。非当前世界的敌人存在但不会更新 AI 或造成碰撞。 */
@@ -8,6 +9,7 @@ public final class Enemy {
     private final EnemyKind kind;
     private WorldType world;
     private final boolean boss;
+    private final Difficulty difficulty;
     private final int maxHp;
     private final int defense;
     private double x;
@@ -36,18 +38,25 @@ public final class Enemy {
     private double guardRemaining;
 
     /**
-     * @param floor 所在层数（从 1 开始）：生命值按层增长，防御随层提高
+     * @param floor      所在层数（从 1 开始）：生命值按层增长，防御随层提高
+     * @param difficulty 本局难度：在同一套层数成长之上再乘难度倍率
      */
-    public Enemy(EnemyKind kind, WorldType world, double x, double y, int floor) {
+    public Enemy(EnemyKind kind, WorldType world, double x, double y, int floor, Difficulty difficulty) {
         this.kind = kind;
         this.world = world;
         this.boss = kind == EnemyKind.WATCHER;
         this.x = x;
         this.y = y;
-        this.maxHp = scaledHitPoints(kind, floor);
-        this.defense = floorDefense(floor);
+        this.difficulty = difficulty == null ? Difficulty.NORMAL : difficulty;
+        this.maxHp = scaledHitPoints(kind, floor, this.difficulty);
+        this.defense = floorDefense(floor, this.difficulty);
         this.hp = maxHp;
         this.alertRemaining = GameConfig.ENEMY_ALERT_TIME;
+    }
+
+    /** 标准难度下的敌人。 */
+    public Enemy(EnemyKind kind, WorldType world, double x, double y, int floor) {
+        this(kind, world, x, y, floor, Difficulty.NORMAL);
     }
 
     public EnemyKind getKind() { return kind; }
@@ -62,6 +71,9 @@ public final class Enemy {
     public boolean isDead() { return hp <= 0; }
     /** 防御：每次受击固定减免的伤害量。 */
     public int getDefense() { return defense; }
+
+    /** 生成这只敌人时的难度（生命与防御已按它算好）。 */
+    public Difficulty getDifficulty() { return difficulty; }
 
     /**
      * 承受玩家一次攻击：先扣除防御，但每次至少造成 1 点伤害。
@@ -218,15 +230,20 @@ public final class Enemy {
     /** 连续没有更接近玩家的累计时间（秒），供调试与测试观察。 */
     public double getStuckTime() { return stuckTime; }
 
-    /** 第 N 层的生命值：基础生命值随层数按比例增长（四舍五入，至少 1）。 */
-    private static int scaledHitPoints(EnemyKind kind, int floor) {
-        double scale = 1.0 + (Math.max(1, floor) - 1) * GameConfig.ENEMY_HP_GROWTH_PER_FLOOR;
-        return Math.max(1, (int) Math.round(kind.hitPoints() * scale));
+    /** 第 N 层、指定难度下的生命值：基础生命值 × 层数成长 × 难度倍率（四舍五入，至少 1）。 */
+    private static int scaledHitPoints(EnemyKind kind, int floor, Difficulty difficulty) {
+        double floorScale = 1.0 + (Math.max(1, floor) - 1) * GameConfig.ENEMY_HP_GROWTH_PER_FLOOR;
+        return Math.max(1, (int) Math.round(kind.hitPoints() * floorScale * difficulty.enemyStatMultiplier()));
     }
 
-    /** 第 N 层的防御：每层 +1，并封顶在 {@link GameConfig#ENEMY_DEFENSE_MAX}。 */
-    private static int floorDefense(int floor) {
-        return Math.min(GameConfig.ENEMY_DEFENSE_MAX,
-                (Math.max(1, floor) - 1) * GameConfig.ENEMY_DEFENSE_PER_FLOOR);
+    /**
+     * 第 N 层、指定难度下的防御：每层 +1 后乘难度倍率并向下取整（简单难度会更晚才有防御），
+     * 上限同样随难度缩放。
+     */
+    private static int floorDefense(int floor, Difficulty difficulty) {
+        double multiplier = difficulty.enemyStatMultiplier();
+        double raw = (Math.max(1, floor) - 1) * GameConfig.ENEMY_DEFENSE_PER_FLOOR * multiplier;
+        int cap = (int) Math.round(GameConfig.ENEMY_DEFENSE_MAX * multiplier);
+        return Math.min(cap, (int) Math.floor(raw));
     }
 }

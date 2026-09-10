@@ -1,5 +1,7 @@
 package com.phantomcorridor.config;
 
+import com.phantomcorridor.model.Difficulty;
+
 /**
  * 全局游戏设置（随功能开发逐步生效与完善）。
  *
@@ -40,6 +42,9 @@ public class Settings {
 
     /** 开发模式随机种子（空字符串表示每次随机；第 5 天地图生成接入） */
     private String devSeed = "";
+
+    /** 本局难度（主菜单点击"开始游戏"时选择，默认标准） */
+    private Difficulty difficulty = Difficulty.NORMAL;
 
 
     /** @return 鼠标灵敏度倍率（0.5~2.0） */
@@ -82,12 +87,23 @@ public class Settings {
         this.devSeed = devSeed == null ? "" : devSeed.trim();
     }
 
+    /** @return 本局难度（默认 {@link Difficulty#NORMAL}） */
+    public Difficulty getDifficulty() {
+        return difficulty;
+    }
+
+    /** @param difficulty 本局难度；传 null 时回落到标准 */
+    public void setDifficulty(Difficulty difficulty) {
+        this.difficulty = difficulty == null ? Difficulty.NORMAL : difficulty;
+    }
+
     /** 恢复全部设置到默认值（供"恢复默认"按钮调用） */
     public void reset() {
         mouseSensitivity = DEFAULT_MOUSE_SENSITIVITY;
         sfxVolume = DEFAULT_SFX_VOLUME;
         musicVolume = DEFAULT_MUSIC_VOLUME;
         devSeed = "";
+        difficulty = Difficulty.NORMAL;
     }
 
     /** 将数值钳制到 [min, max] 闭区间 */

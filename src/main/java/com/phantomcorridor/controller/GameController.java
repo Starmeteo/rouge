@@ -38,7 +38,6 @@ public final class GameController {
             protected void update(double dt) {
                 session.update(dt, input.horizontal(), input.vertical(), aimX, aimY, attackHeld);
             }
-
             @Override
             protected void render(double frameDelta) {
                 view.render(session, getSmoothedFps());
@@ -52,7 +51,7 @@ public final class GameController {
     }
 
     public void newRun() {
-        session.newRun(settings.getDevSeed());
+        session.newRun(settings.getDevSeed(), settings.getDifficulty());
         input.clear();
         shiftHeld = false;
         interactHeld = false;

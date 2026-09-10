@@ -26,6 +26,7 @@ public final class GameSession {
     private long runSeed;
     private long dungeonSeed;
     private int floor = 1;
+    private Difficulty difficulty = Difficulty.NORMAL;
     private boolean runCleared;
     private double phasePulseVisibleRemaining;
     private double aimX;
@@ -37,10 +38,19 @@ public final class GameSession {
 
     public void newRun() { newRun(""); }
 
-    public void newRun(String configuredSeed) {
+    public void newRun(String configuredSeed) { newRun(configuredSeed, Difficulty.NORMAL); }
+
+    /**
+     * 开始新的一局。
+     *
+     * @param configuredSeed 开发种子（空串表示随机）
+     * @param difficulty     本局难度：只影响敌人的基础属性
+     */
+    public void newRun(String configuredSeed, Difficulty difficulty) {
         player.reset(AppConfig.VIEW_WIDTH / 2.0, AppConfig.VIEW_HEIGHT / 2.0);
         worldShift.reset();
         runSeed = MapGenerator.parseSeed(configuredSeed);
+        this.difficulty = difficulty == null ? Difficulty.NORMAL : difficulty;
         floor = 1;
         runCleared = false;
         aimX = player.getX() + 1.0;
@@ -60,6 +70,7 @@ public final class GameSession {
         enemyProjectiles.reset();
         enemies.reset();
         enemies.setFloor(floor);
+        enemies.setDifficulty(difficulty);
         roomContent.reset(dungeonSeed, floor);
         navigation.reset(new MapGenerator().generate(dungeonSeed));
         navigation.placeAtEntrance(player);
@@ -165,6 +176,9 @@ public final class GameSession {
 
     /** 当前层数（从 1 开始）。 */
     public int getFloor() { return floor; }
+
+    /** 本局难度。 */
+    public Difficulty getDifficulty() { return difficulty; }
 
     /** 一局总共多少层。 */
     public int getTotalFloors() { return GameConfig.TOTAL_FLOORS; }

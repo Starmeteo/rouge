@@ -3,6 +3,7 @@ package com.phantomcorridor.view;
 import com.phantomcorridor.config.AppConfig;
 import com.phantomcorridor.config.Settings;
 import com.phantomcorridor.controller.SceneLifecycle;
+import com.phantomcorridor.model.Difficulty;
 import javafx.animation.FadeTransition;
 import javafx.animation.ParallelTransition;
 import javafx.animation.ScaleTransition;
@@ -19,11 +20,14 @@ import javafx.scene.layout.HBox;
 import javafx.scene.layout.Region;
 import javafx.scene.layout.StackPane;
 import javafx.scene.layout.VBox;
+import javafx.scene.text.TextAlignment;
 import javafx.util.Duration;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.function.Supplier;
+import java.util.stream.Collectors;
 
 /**
  * 主菜单面板（对应《双界行者》需求 §8.2 主菜单）。
@@ -65,11 +69,20 @@ public class MainMenuView extends StackPane implements SceneLifecycle {
     /** 标题节点（开始过渡动画需要引用） */
     private final Label title = new Label(TITLE);
 
+    /** 开始按钮（覆盖层打开时要让出 Enter 默认键） */
+    private Button startButton;
+
+    /** 难度面板里的「标准」按钮：难度面板打开时接管 Enter 默认键 */
+    private Button normalDifficultyButton;
+
     /** 主菜单内容（标题组 + 分隔线 + 按钮），与覆盖层互斥显示 */
     private final VBox menuContent;
 
     /** 道具图鉴覆盖层（对应 §8.2，占位展示道具分类） */
     private final VBox galleryContent;
+
+    /** 难度选择覆盖层（点击「开始游戏」后弹出） */
+    private final VBox difficultyContent;
 
     /** 设置覆盖层（构造时赋值，回调中引用自身，故不可为 final） */
     private VBox settingsContent;
@@ -100,7 +113,7 @@ public class MainMenuView extends StackPane implements SceneLifecycle {
         getChildren().add(backdrop);
 
         title.getStyleClass().add("menu-title");
-        menuContent = createMenuContent(onStart, onQuit);
+        menuContent = createMenuContent(onQuit);
 
         // 底部版本信息（常驻）
         Label footer = new Label(FOOTER);
@@ -108,8 +121,9 @@ public class MainMenuView extends StackPane implements SceneLifecycle {
         footer.setPadding(new Insets(0, 0, 18, 0));
         StackPane.setAlignment(footer, Pos.BOTTOM_CENTER);
 
-        // 覆盖层：道具图鉴与设置（默认隐藏）
+        // 覆盖层：道具图鉴、难度选择与设置（默认隐藏）
         galleryContent = createGalleryContent();
+        difficultyContent = createDifficultyContent(settings, onStart);
         settingsContent = new SettingsOverlay(settings, nicknameSupplier,
                 () -> hideOverlay(settingsContent, this::fadeInMenu));
         settingsContent.setVisible(false);
@@ -126,7 +140,7 @@ public class MainMenuView extends StackPane implements SceneLifecycle {
         overlay.setManaged(false);
 
         // 层叠顺序：背景画布 → 菜单内容 → 底部信息 → 覆盖层 → 双界遮罩
-        getChildren().addAll(menuContent, footer, galleryContent, settingsContent, overlay);
+        getChildren().addAll(menuContent, footer, galleryContent, difficultyContent, settingsContent, overlay);
 
         // Esc 收起覆盖层（§4.3：Esc = 返回）
         setOnKeyPressed(event -> {
@@ -135,6 +149,8 @@ public class MainMenuView extends StackPane implements SceneLifecycle {
             }
             if (settingsContent.isVisible()) {
                 hideOverlay(settingsContent, this::fadeInMenu);
+            } else if (difficultyContent.isVisible()) {
+                hideOverlay(difficultyContent, this::fadeInMenu);
             } else if (galleryContent.isVisible()) {
                 hideOverlay(galleryContent, this::fadeInMenu);
             }
@@ -144,7 +160,7 @@ public class MainMenuView extends StackPane implements SceneLifecycle {
     }
 
     /** 构建菜单主体：标题 + 副标题 + 分隔线 + 操作按钮（§8.2） */
-    private VBox createMenuContent(Runnable onStart, Runnable onQuit) {
+    private VBox createMenuContent(Runnable onQuit) {
         Label subtitle = new Label(SUBTITLE);
         subtitle.getStyleClass().add("menu-subtitle");
 
@@ -155,8 +171,9 @@ public class MainMenuView extends StackPane implements SceneLifecycle {
         Region divider = new Region();
         divider.getStyleClass().add("menu-divider");
 
-        Button startButton = createMenuButton("开始游戏", () -> playStartTransition(onStart));
-        startButton.setDefaultButton(true); // Enter 快捷开始
+        Button startButton = createMenuButton("开始游戏", () -> showOverlay(difficultyContent));
+        this.startButton = startButton;
+        startButton.setDefaultButton(true); // Enter 快捷开始（打开难度面板）
 
         Button galleryButton = createMenuButton("道具图鉴", () -> showOverlay(galleryContent));
         Button settingsButton = createMenuButton("设置", () -> showOverlay(settingsContent));
@@ -198,6 +215,62 @@ public class MainMenuView extends StackPane implements SceneLifecycle {
         box.setVisible(false);
         box.setManaged(false);
         return box;
+    }
+
+    /**
+     * 构建难度选择覆盖层：点击「开始游戏」后先选难度再进游戏。
+     *
+     * <p>难度只改敌人的生命与防御基础值，与层数成长叠加；选好后走与原来相同的开始过渡。
+     */
+    private VBox createDifficultyContent(Settings settings, Runnable onStart) {
+        Label heading = new Label("选择难度");
+        heading.getStyleClass().add("overlay-title");
+
+        Label hint = new Label("难度只影响敌人的生命与防御基础值（与层数成长叠加），玩家的生命、金币与装备不变。");
+        hint.getStyleClass().add("hint-text");
+
+        VBox options = new VBox(14.0);
+        options.setAlignment(Pos.CENTER);
+        for (Difficulty difficulty : Difficulty.values()) {
+            Button option = createMenuButton(difficulty.displayName() + "　" + difficulty.percentText(),
+                    () -> chooseDifficulty(settings, difficulty, onStart));
+            if (difficulty == settings.getDifficulty()) {
+                option.getStyleClass().add("menu-button-current");
+            }
+            if (difficulty == Difficulty.NORMAL) {
+                normalDifficultyButton = option;
+            }
+            options.getChildren().add(option);
+        }
+
+        Label detail = new Label(describeDifficulties());
+        detail.getStyleClass().add("hint-text");
+        detail.setWrapText(true);
+        detail.setMaxWidth(720.0);
+        detail.setTextAlignment(TextAlignment.CENTER);
+
+        Button backButton = createMenuButton("返回菜单", () -> hideOverlay(difficultyContent, this::fadeInMenu));
+
+        VBox box = new VBox(22.0, heading, hint, options, detail, backButton);
+        box.setAlignment(Pos.CENTER);
+        box.setFillWidth(false);
+        box.setMaxWidth(VBox.USE_PREF_SIZE);
+        box.setVisible(false);
+        box.setManaged(false);
+        return box;
+    }
+
+    /** 四档难度的一句话说明，拼成面板底部那行小字。 */
+    private static String describeDifficulties() {
+        return Arrays.stream(Difficulty.values())
+                .map(value -> value.displayName() + "：" + value.description())
+                .collect(Collectors.joining("　·　"));
+    }
+
+    /** 选定难度：写回设置后按原来的开始过渡进入游戏。 */
+    private void chooseDifficulty(Settings settings, Difficulty difficulty, Runnable onStart) {
+        settings.setDifficulty(difficulty);
+        playStartTransition(onStart);
     }
 
     /** 向两列表格追加一行（名称 + 说明；两列内容均在列内水平居中，见 ui.css） */
@@ -294,6 +367,11 @@ public class MainMenuView extends StackPane implements SceneLifecycle {
         if (panel instanceof SettingsOverlay settingsOverlay) {
             settingsOverlay.refreshProfile();
         }
+        // 覆盖层打开时「开始游戏」不再吃 Enter，避免在设置/图鉴里按回车直接开局。
+        startButton.setDefaultButton(false);
+        if (normalDifficultyButton != null) {
+            normalDifficultyButton.setDefaultButton(panel == difficultyContent);
+        }
         FadeTransition out = new FadeTransition(Duration.millis(150.0), menuContent);
         out.setToValue(0.0);
         out.setOnFinished(event -> {
@@ -327,6 +405,9 @@ public class MainMenuView extends StackPane implements SceneLifecycle {
             panel.setManaged(false);
             menuContent.setVisible(true);
             menuContent.setManaged(true);
+            // 回到主菜单：Enter 恢复为「开始游戏」。
+            if (normalDifficultyButton != null) normalDifficultyButton.setDefaultButton(false);
+            startButton.setDefaultButton(true);
             onFinished.run();
             transitionLocked = false;
         });
@@ -401,8 +482,12 @@ public class MainMenuView extends StackPane implements SceneLifecycle {
         menuContent.setOpacity(1.0);
         galleryContent.setVisible(false);
         galleryContent.setManaged(false);
+        difficultyContent.setVisible(false);
+        difficultyContent.setManaged(false);
         settingsContent.setVisible(false);
         settingsContent.setManaged(false);
+        if (normalDifficultyButton != null) normalDifficultyButton.setDefaultButton(false);
+        startButton.setDefaultButton(true);
         playEnterAnimation();
     }
 

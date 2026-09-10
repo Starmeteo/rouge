@@ -1,6 +1,7 @@
 package com.phantomcorridor.model.combat;
 
 import com.phantomcorridor.config.GameConfig;
+import com.phantomcorridor.model.Difficulty;
 import com.phantomcorridor.model.RoomType;
 import com.phantomcorridor.model.WorldType;
 import com.phantomcorridor.model.entity.Enemy;
@@ -48,6 +49,7 @@ public final class EnemySystem {
     private int activeRoomId = -1;
     private int killsSinceLastRead;
     private int floor = 1;
+    private Difficulty difficulty = Difficulty.NORMAL;
     private BlinkFlash blinkFlash;
 
     /** 最近一次裂隙闪现的特效状态；已结束时返回 null。 */
@@ -67,6 +69,13 @@ public final class EnemySystem {
     public void setFloor(int floor) { this.floor = Math.max(1, floor); }
 
     public int getFloor() { return floor; }
+
+    /** 本局难度：与层数成长一起决定新生成敌人的基础属性。 */
+    public void setDifficulty(Difficulty difficulty) {
+        this.difficulty = difficulty == null ? Difficulty.NORMAL : difficulty;
+    }
+
+    public Difficulty getDifficulty() { return difficulty; }
 
     /** 仅在未清理的战斗/Boss 房生成；Boss 房严格只生成一名首领。 */
     public void enterRoom(Room room, long dungeonSeed, Player player, RoomNavigationSystem navigation) {
@@ -98,7 +107,7 @@ public final class EnemySystem {
 
     private void spawn(EnemyKind kind, WorldType world, Room room, Player player,
                        RoomNavigationSystem navigation, Random random) {
-        Enemy enemy = new Enemy(kind, world, 0.0, 0.0, floor);
+        Enemy enemy = new Enemy(kind, world, 0.0, 0.0, floor, difficulty);
         // 必须按物种真实身位校验：首领 46、精英 34 都比普通怪大，
         // 用统一的小半径放行会让它们出生就压在墙上，之后一步都走不动。
         double radius = enemyRadius(enemy);

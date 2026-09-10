@@ -1,6 +1,7 @@
 package com.phantomcorridor.model.entity;
 
 import com.phantomcorridor.config.GameConfig;
+import com.phantomcorridor.model.Difficulty;
 import com.phantomcorridor.model.WorldType;
 import org.junit.jupiter.api.Test;
 
@@ -58,5 +59,55 @@ class EnemyFloorScalingTest {
         int defense = armoured.getDefense();
 
         assertEquals(3 - defense, armoured.takeHit(3));
+    }
+
+    @Test
+    void difficultyMultipliesTheBaseEnemyStats() {
+        int easy = new Enemy(EnemyKind.GOLEM, WorldType.LIGHT, 0, 0, 1, Difficulty.EASY).getMaxHp();
+        int normal = new Enemy(EnemyKind.GOLEM, WorldType.LIGHT, 0, 0, 1, Difficulty.NORMAL).getMaxHp();
+        int hard = new Enemy(EnemyKind.GOLEM, WorldType.LIGHT, 0, 0, 1, Difficulty.HARD).getMaxHp();
+        int insane = new Enemy(EnemyKind.GOLEM, WorldType.LIGHT, 0, 0, 1, Difficulty.INSANE).getMaxHp();
+
+        // 傀儡基础生命 5：简单 50% → 3，标准 5，困难 150% → 8，屌炸天 200% → 10
+        assertEquals(3, easy);
+        assertEquals(EnemyKind.GOLEM.hitPoints(), normal);
+        assertEquals(8, hard);
+        assertEquals(10, insane);
+        assertEquals(0.5, Difficulty.EASY.enemyStatMultiplier());
+        assertEquals(2.0, Difficulty.INSANE.enemyStatMultiplier());
+        assertEquals("150%", Difficulty.HARD.percentText());
+    }
+
+    @Test
+    void difficultyStacksOnTopOfTheFloorGrowth() {
+        // 第 3 层：层数成长 1.5 倍，再乘难度倍率
+        int normal = new Enemy(EnemyKind.WOLF, WorldType.LIGHT, 0, 0, 3, Difficulty.NORMAL).getMaxHp();
+        int easy = new Enemy(EnemyKind.WOLF, WorldType.LIGHT, 0, 0, 3, Difficulty.EASY).getMaxHp();
+        int insane = new Enemy(EnemyKind.WOLF, WorldType.LIGHT, 0, 0, 3, Difficulty.INSANE).getMaxHp();
+
+        assertEquals(5, normal);   // 3 × 1.5
+        assertEquals(2, easy);     // 3 × 1.5 × 0.5 = 2.25 → 2
+        assertEquals(9, insane);   // 3 × 1.5 × 2.0 = 9
+    }
+
+    @Test
+    void easyDifficultyDelaysEnemyDefenceAndInsaneStacksItFaster() {
+        assertEquals(0, new Enemy(EnemyKind.LANTERN, WorldType.LIGHT, 0, 0, 2, Difficulty.EASY).getDefense(),
+                "简单难度下第二层还没有防御");
+        assertEquals(1, new Enemy(EnemyKind.LANTERN, WorldType.LIGHT, 0, 0, 2, Difficulty.NORMAL).getDefense());
+        assertEquals(1, new Enemy(EnemyKind.LANTERN, WorldType.LIGHT, 0, 0, 2, Difficulty.HARD).getDefense(),
+                "困难 2 层：(2-1) × 1 × 1.5 = 1.5 → 1");
+        assertEquals(2, new Enemy(EnemyKind.LANTERN, WorldType.LIGHT, 0, 0, 2, Difficulty.INSANE).getDefense(),
+                "屌炸天 2 层：(2-1) × 1 × 2 = 2");
+        assertTrue(new Enemy(EnemyKind.LANTERN, WorldType.LIGHT, 0, 0, 5, Difficulty.INSANE).getDefense()
+                        > new Enemy(EnemyKind.LANTERN, WorldType.LIGHT, 0, 0, 5, Difficulty.NORMAL).getDefense(),
+                "高层数下屌炸天的防御上限应当更高");
+    }
+
+    @Test
+    void enemiesWithoutAnExplicitDifficultyStayOnNormal() {
+        Enemy enemy = new Enemy(EnemyKind.MAGE, WorldType.SHADOW, 0, 0, 1);
+        assertEquals(Difficulty.NORMAL, enemy.getDifficulty());
+        assertEquals(EnemyKind.MAGE.hitPoints(), enemy.getMaxHp());
     }
 }
