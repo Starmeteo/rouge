@@ -7,8 +7,9 @@ import com.phantomcorridor.model.WorldType;
 import com.phantomcorridor.model.entity.Player;
 import com.phantomcorridor.model.entity.PlayerAnimationState;
 import com.phantomcorridor.model.combat.Projectile;
-import com.phantomcorridor.model.combat.Enemy;
-import com.phantomcorridor.model.combat.EnemyProjectile;
+import com.phantomcorridor.model.combat.EnemyAttack;
+import com.phantomcorridor.model.entity.Enemy;
+import com.phantomcorridor.model.entity.EnemyKind;
 import com.phantomcorridor.model.room.Direction;
 import com.phantomcorridor.model.room.Room;
 import com.phantomcorridor.model.room.RoomArea;
@@ -43,6 +44,7 @@ public final class GameRenderer {
     private static final Image[] SHADOW_SLASHES = loadSeries("black_magenta", "effects_aligned", "slash_arc_right", 4);
     private static final Image[] LIGHT_AURA = loadSeries("white_cyan", "effects_aligned", "aura", 3);
     private static final Image[] SHADOW_AURA = loadSeries("black_magenta", "effects_aligned", "aura", 3);
+    private static final Map<String, Image> MONSTER_IMAGES = new HashMap<>();
 
     public void render(GraphicsContext g, GameSession session, double fps) {
         g.setImageSmoothing(false);
@@ -51,9 +53,8 @@ public final class GameRenderer {
         drawFloor(g, light);
         drawRoom(g, session, light);
         drawPhaseWalls(g, session, light);
-        drawEnemyProjectiles(g, session, light);
-        drawEnemies(g, session, light);
-        drawPickups(g, session);
+        drawEnemies(g, session, player.getCurrentWorld());
+        drawEnemyAttacks(g, session, player.getCurrentWorld());
         drawPlayer(g, player, light);
         // 攻击层在角色之后绘制，避免角色把斩击和投射物遮住。
         drawAttacks(g, session, light);
@@ -73,6 +74,77 @@ public final class GameRenderer {
         g.setStroke(Color.color(color.getRed(), color.getGreen(), color.getBlue(), 0.74));
         g.setLineWidth(4.0);
         g.strokeRect(player.getX() - radius, player.getY() - radius, radius * 2.0, radius * 2.0);
+    }
+
+    /** 非当前世界的敌人及攻击完全不绘制，与模型的同界碰撞规则保持一致。 */
+    private void drawEnemies(GraphicsContext g, GameSession session, WorldType currentWorld) {
+        List<Enemy> visible = session.getEnemies().getEnemies().stream()
+                .filter(enemy -> enemy.getWorld() == currentWorld).sorted(Comparator.comparingDouble(Enemy::getY)).toList();
+        for (Enemy enemy : visible) {
+            String world = enemy.getWorld() == WorldType.LIGHT ? "light" : "shadow";
+            Image body = monsterImage("enemies/" + enemy.getKind().assetId() + "/" + world + "/idle/front_01.png");
+            double size = enemy.isBoss() ? 230 : enemy.getKind().elite() ? 154 : 118;
+            double x = Math.rint(enemy.getX() - size / 2.0);
+            if (body != null) {
+                double height = size * body.getHeight() / Math.max(1.0, body.getWidth());
+                g.drawImage(body, x, Math.rint(enemy.getY() - height * 0.70), size, height);
+            } else {
+                g.setFill(enemy.getWorld() == WorldType.LIGHT ? LIGHT_GOLD : SHADOW_VIOLET);
+                g.fillRect(x, enemy.getY() - size / 2.0, size, size);
+            }
+            drawEnemyHealth(g, enemy, currentWorld == WorldType.LIGHT ? LIGHT_GOLD : SHADOW_VIOLET);
+        }
+    }
+
+    private void drawEnemyHealth(GraphicsContext g, Enemy enemy, Color domain) {
+        double width = enemy.isBoss() ? 126 : 58;
+        double x = enemy.getX() - width / 2.0;
+        double y = enemy.getY() - (enemy.isBoss() ? 120 : 66);
+        g.setFill(Color.rgb(0, 0, 0, 0.68));
+        g.fillRect(x, y, width, 6);
+        g.setFill(Color.color(domain.getRed(), domain.getGreen(), domain.getBlue(), 0.92));
+        g.fillRect(x + 1, y + 1, (width - 2) * enemy.getHp() / enemy.getMaxHp(), 4);
+    }
+
+    private void drawEnemyAttacks(GraphicsContext g, GameSession session, WorldType currentWorld) {
+        for (EnemyAttack attack : session.getEnemies().getAttacks()) {
+            if (attack.getWorld() != currentWorld) continue;
+            String world = currentWorld == WorldType.LIGHT ? "light" : "shadow";
+            String effect = enemyEffect(attack.getSource(), currentWorld);
+            Image sprite = monsterImage("effects/" + attack.getSource().assetId() + "/" + world + "/" + effect + "/right_01.png");
+            double size = attack.getSource() == EnemyKind.WATCHER ? 84 : 54;
+            if (sprite != null) {
+                double height = size * sprite.getHeight() / Math.max(1.0, sprite.getWidth());
+                g.setGlobalBlendMode(BlendMode.ADD);
+                g.drawImage(sprite, attack.getX() - size / 2.0, attack.getY() - height / 2.0, size, height);
+                g.setGlobalBlendMode(BlendMode.SRC_OVER);
+            } else {
+                g.setFill(currentWorld == WorldType.LIGHT ? Color.web("#fff0a2") : Color.web("#d59aff"));
+                g.fillOval(attack.getX() - attack.getRadius(), attack.getY() - attack.getRadius(),
+                        attack.getRadius() * 2, attack.getRadius() * 2);
+            }
+        }
+    }
+
+    private static String enemyEffect(EnemyKind kind, WorldType world) {
+        boolean light = world == WorldType.LIGHT;
+        return switch (kind) {
+            case LANTERN -> light ? "seeker_orb" : "dusk_needle";
+            case WOLF -> light ? "bite_flash" : "bite_arc";
+            case GOLEM -> light ? "ground_crack" : "slam_sector";
+            case MAGE -> light ? "fan_pellet" : "mirror_arc";
+            case EXECUTIONER -> light ? "spear_projectile" : "cleave_arc";
+            case BELL -> light ? "bell_pellet" : "annular_burst";
+            case WATCHER -> light ? "rift_spear" : "slash_arc";
+        };
+    }
+
+    private static Image monsterImage(String relativePath) {
+        if (MONSTER_IMAGES.containsKey(relativePath)) return MONSTER_IMAGES.get(relativePath);
+        var resource = GameRenderer.class.getResource("/com/phantomcorridor/sprites/monsters/" + relativePath);
+        Image image = resource == null ? null : new Image(resource.toExternalForm(), false);
+        MONSTER_IMAGES.put(relativePath, image);
+        return image;
     }
 
     private void drawAttacks(GraphicsContext g, GameSession session, boolean light) {

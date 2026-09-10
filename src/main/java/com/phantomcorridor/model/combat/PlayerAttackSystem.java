@@ -15,12 +15,14 @@ public final class PlayerAttackSystem {
     private double cooldownRemaining;
     private double meleeVisibleRemaining;
     private double meleeAngleRadians;
+    private int meleeAttackId;
 
     public void reset() {
         projectiles.clear();
         cooldownRemaining = 0.0;
         meleeVisibleRemaining = 0.0;
         meleeAngleRadians = 0.0;
+        meleeAttackId = 0;
     }
 
     public void update(double dt) {
@@ -75,6 +77,7 @@ public final class PlayerAttackSystem {
         } else {
             if (!player.consumeAttackCharge()) return false;
             meleeVisibleRemaining = GameConfig.SHADOW_MELEE_VISIBLE_TIME;
+            meleeAttackId++;
             cooldownRemaining = GameConfig.SHADOW_ATTACK_COOLDOWN;
         }
         return true;
@@ -86,5 +89,6 @@ public final class PlayerAttackSystem {
 
     public boolean isMeleeVisible() { return meleeVisibleRemaining > 0.0; }
     public double getMeleeAngleRadians() { return meleeAngleRadians; }
+    public int getMeleeAttackId() { return meleeAttackId; }
     public double getCooldownRemaining() { return cooldownRemaining; }
 }

@@ -2,7 +2,6 @@ package com.phantomcorridor.model.room;
 
 import com.phantomcorridor.config.GameConfig;
 import com.phantomcorridor.config.RoomConfig;
-import com.phantomcorridor.model.RoomType;
 import com.phantomcorridor.model.WorldType;
 import com.phantomcorridor.model.dungeon.DungeonMap;
 import com.phantomcorridor.model.entity.Player;
