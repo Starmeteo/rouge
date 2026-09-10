@@ -19,6 +19,14 @@ public final class Enemy {
     private double alertRemaining;
     private double attackCooldown;
     private double blinkCooldown;
+    /** 首领召唤：距离下一次增援召唤还有多久（秒），开场置为 {@link GameConfig#WATCHER_SUMMON_OPENING_DELAY}。 */
+    private double summonCooldown;
+    /** 首领召唤：连续打不到玩家的累计时间（秒），重新获得开火视线时清零。 */
+    private double summonPressure;
+    /** 首领召唤：已经用掉的血量阶段数（0 起），由召唤系统在真正召唤成功时推进。 */
+    private int summonStage;
+    /** 是否为首领召唤出来的造物（首领倒下或离开该界时随之溃散）。 */
+    private final boolean summoned;
     private int avoidanceSide;
     private double avoidanceHeading = Double.NaN;
     private double avoidanceStuckTime;
@@ -42,16 +50,36 @@ public final class Enemy {
      * @param difficulty 本局难度：在同一套层数成长之上再乘难度倍率
      */
     public Enemy(EnemyKind kind, WorldType world, double x, double y, int floor, Difficulty difficulty) {
+        this(kind, world, x, y, floor, difficulty, 1.0, false);
+    }
+
+    /**
+     * 首领召唤出来的造物：同一物种的“缩水版”，并且标记为召唤物。
+     *
+     * <p>只用于普通物种——召唤出来的东西不该再是首领（{@code kind == WATCHER} 会被当成首领实体）。
+     *
+     * @param hitPointScale 生命倍率（{@link GameConfig#WATCHER_SUMMON_HP_SCALE}）
+     */
+    public static Enemy summoned(EnemyKind kind, WorldType world, double x, double y,
+                                 int floor, Difficulty difficulty, double hitPointScale) {
+        return new Enemy(kind, world, x, y, floor, difficulty, hitPointScale, true);
+    }
+
+    private Enemy(EnemyKind kind, WorldType world, double x, double y, int floor, Difficulty difficulty,
+                  double hitPointScale, boolean summoned) {
         this.kind = kind;
         this.world = world;
         this.boss = kind == EnemyKind.WATCHER;
+        this.summoned = summoned;
         this.x = x;
         this.y = y;
         this.difficulty = difficulty == null ? Difficulty.NORMAL : difficulty;
-        this.maxHp = scaledHitPoints(kind, floor, this.difficulty);
+        this.maxHp = scaledHitPoints(kind, floor, this.difficulty, hitPointScale);
         this.defense = floorDefense(floor, this.difficulty);
         this.hp = maxHp;
         this.alertRemaining = GameConfig.ENEMY_ALERT_TIME;
+        // 首领开场先有一段“单挑时间”，之后才允许召唤增援。
+        this.summonCooldown = boss ? GameConfig.WATCHER_SUMMON_OPENING_DELAY : 0.0;
     }
 
     /** 标准难度下的敌人。 */
@@ -61,7 +89,11 @@ public final class Enemy {
 
     public EnemyKind getKind() { return kind; }
     public WorldType getWorld() { return world; }
-    public void setWorld(WorldType world) { this.world = world; this.alertRemaining = GameConfig.ENEMY_ALERT_TIME; }
+    public void setWorld(WorldType world) {
+        this.world = world;
+        this.alertRemaining = GameConfig.ENEMY_ALERT_TIME;
+        this.summonPressure = 0.0;
+    }
     public boolean isBoss() { return boss; }
     public double getX() { return x; }
     public double getY() { return y; }
@@ -104,10 +136,33 @@ public final class Enemy {
 
     public void setBlinkCooldown(double seconds) { blinkCooldown = Math.max(0.0, seconds); }
 
+    /** 是否为首领召唤出来的造物：首领倒下或离开该界时，这些造物会一并溃散。 */
+    public boolean isSummoned() { return summoned; }
+
+    /** 距离下一次增援召唤还有多久（秒）；只有守望者会用到。 */
+    public double getSummonCooldown() { return summonCooldown; }
+
+    public void setSummonCooldown(double seconds) { summonCooldown = Math.max(0.0, seconds); }
+
+    /** 连续打不到玩家的累计时间（秒）。 */
+    public double getSummonPressure() { return summonPressure; }
+
+    public void addSummonPressure(double dt) { summonPressure += Math.max(0.0, dt); }
+
+    /** 重新看得见玩家（或玩家切界、让首领丢失目标）时清零，避免把“刚才那 5 秒”一直记着。 */
+    public void resetSummonPressure() { summonPressure = 0.0; }
+
+    /** 已经用掉的血量阶段召唤次数。 */
+    public int getSummonStage() { return summonStage; }
+
+    /** 血量阶段召唤真正放出去之后才推进，否则阶段会被白白吃掉。 */
+    public void advanceSummonStage() { summonStage++; }
+
     public void updateTimers(double dt) {
         alertRemaining = Math.max(0.0, alertRemaining - dt);
         attackCooldown = Math.max(0.0, attackCooldown - dt);
         blinkCooldown = Math.max(0.0, blinkCooldown - dt);
+        summonCooldown = Math.max(0.0, summonCooldown - dt);
         guardRemaining = Math.max(0.0, guardRemaining - dt);
         animationTime += Math.max(0.0, dt);
     }
@@ -159,6 +214,7 @@ public final class Enemy {
     public void loseAwareness() {
         aware = false;
         alertRemaining = GameConfig.ENEMY_ALERT_TIME;
+        summonPressure = 0.0;
     }
 
     /**
@@ -230,10 +286,11 @@ public final class Enemy {
     /** 连续没有更接近玩家的累计时间（秒），供调试与测试观察。 */
     public double getStuckTime() { return stuckTime; }
 
-    /** 第 N 层、指定难度下的生命值：基础生命值 × 层数成长 × 难度倍率（四舍五入，至少 1）。 */
-    private static int scaledHitPoints(EnemyKind kind, int floor, Difficulty difficulty) {
+    /** 第 N 层、指定难度下的生命值：基础生命值 × 层数成长 × 难度倍率 × 实例倍率（四舍五入，至少 1）。 */
+    private static int scaledHitPoints(EnemyKind kind, int floor, Difficulty difficulty, double hitPointScale) {
         double floorScale = 1.0 + (Math.max(1, floor) - 1) * GameConfig.ENEMY_HP_GROWTH_PER_FLOOR;
-        return Math.max(1, (int) Math.round(kind.hitPoints() * floorScale * difficulty.enemyStatMultiplier()));
+        double scale = hitPointScale <= 0.0 ? 1.0 : hitPointScale;
+        return Math.max(1, (int) Math.round(kind.hitPoints() * floorScale * difficulty.enemyStatMultiplier() * scale));
     }
 
     /**

@@ -3,7 +3,8 @@ package com.phantomcorridor.model.combat;
 import com.phantomcorridor.config.GameConfig;
 import com.phantomcorridor.model.entity.Player;
 import com.phantomcorridor.model.RoomType;
-import com.phantomcorridor.model.WorldType;
+// 未使用（IDE 的 Unused import 会报）：用例里的世界切换都走 Player.toggleWorld / 实体自带的世界。
+// import com.phantomcorridor.model.WorldType;
 import com.phantomcorridor.model.dungeon.DungeonMap;
 import com.phantomcorridor.model.room.Room;
 import com.phantomcorridor.model.room.RoomArea;

@@ -15,6 +15,7 @@ import com.phantomcorridor.util.CollisionUtil;
 
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.EnumMap;
 import java.util.HashMap;
 import java.util.List;
@@ -26,6 +27,9 @@ import java.util.Random;
  *
  * <p>索敌规则：同界敌人只要与玩家同处一房就会锁定玩家并主动接近（见 {@link #detectionRange()}），
  * 被墙挡住视线时继续绕行接近、只有确实看得见玩家时才开火；玩家换界后敌人丢失目标，重新索敌。
+ *
+ * <p>首领另有召唤机制：裂隙先成型、召唤物后落地，什么时候召唤由血量阶段、打不到玩家的时长
+ * 与场上剩余召唤物共同决定（见 {@link #beginSummonIfDue}）。
  */
 public final class EnemySystem {
     /** 一次裂隙闪现的视觉残留：起点、终点与剩余时间，供渲染层画裂隙特效。 */
@@ -41,13 +45,18 @@ public final class EnemySystem {
             {0, -22.5, -45, -67.5, -90, -112.5, -135, -157.5, 180}
     };
 
+    /** 守望者的血量召唤阶段：血量第一次跌破这些比例时立刻召唤一次（无视冷却）。 */
+    private static final double[] SUMMON_STAGE_HP = {0.70, 0.35};
+
     private final List<Enemy> enemies = new ArrayList<>();
     private final List<EnemyAttack> attacks = new ArrayList<>();
     private final List<EnemyVisualEffect> visualEffects = new ArrayList<>();
+    private final List<SummonRift> summonRifts = new ArrayList<>();
     private final Map<Enemy, ActiveCast> activeCasts = new HashMap<>();
     private final EnumMap<WorldType, Map<Integer, RoomFlowField>> flowFields = new EnumMap<>(WorldType.class);
     private int activeRoomId = -1;
     private int killsSinceLastRead;
+    private int summonCallsSinceLastRead;
     private int floor = 1;
     private Difficulty difficulty = Difficulty.NORMAL;
     private BlinkFlash blinkFlash;
@@ -59,10 +68,12 @@ public final class EnemySystem {
         enemies.clear();
         attacks.clear();
         visualEffects.clear();
+        summonRifts.clear();
         activeCasts.clear();
         flowFields.clear();
         activeRoomId = -1;
         killsSinceLastRead = 0;
+        summonCallsSinceLastRead = 0;
     }
 
     /** 当前层数：决定新生成敌人的生命值与防御。 */
@@ -83,6 +94,7 @@ public final class EnemySystem {
         enemies.clear();
         attacks.clear();
         visualEffects.clear();
+        summonRifts.clear();
         activeCasts.clear();
         activeRoomId = room.id();
         if (room.isCleared() || (room.type() != RoomType.BATTLE && room.type() != RoomType.BOSS)) return;
@@ -132,6 +144,8 @@ public final class EnemySystem {
         visualEffects.forEach(effect -> effect.update(dt));
         visualEffects.removeIf(EnemyVisualEffect::expired);
 
+        boolean bossFell = false;
+        boolean bossCrossedOver = false;
         for (var iterator = enemies.iterator(); iterator.hasNext();) {
             Enemy enemy = iterator.next();
             enemy.updateTimers(dt);
@@ -140,6 +154,7 @@ public final class EnemySystem {
                         enemy.getX(), enemy.getY(), enemy.isBoss() ? 323 : enemy.getKind().elite() ? 230 : 179, .70));
                 activeCasts.remove(enemy);
                 killsSinceLastRead++;
+                bossFell |= enemy.isBoss();
                 iterator.remove();
                 continue;
             }
@@ -149,6 +164,9 @@ public final class EnemySystem {
                 attacks.removeIf(attack -> attack.getSource() == EnemyKind.WATCHER);
                 visualEffects.add(new EnemyVisualEffect(enemy.getKind(), WorldType.LIGHT, "phase_transition",
                         enemy.getX(), enemy.getY(), 0.0, 210, .45));
+                // 素材包规则 clearOnBossWorldExit：首领离开某一界，它在那一界留下的造物随之溃散。
+                // 真正清理由循环外的 collapseSummons 执行——在遍历 enemies 时删除会直接抛并发修改异常。
+                bossCrossedOver = true;
             }
             if (enemy.getWorld() != player.getCurrentWorld()) continue;
             if (advanceCast(enemy, player, navigation)) continue;
@@ -168,8 +186,18 @@ public final class EnemySystem {
                     player.getX(), player.getY(), GameConfig.ENEMY_PROJECTILE_RADIUS, enemy.getWorld());
             maybeEscapeWedge(enemy, player, navigation, dt, distance, lineOfSight);
             moveTowardPlayer(enemy, player, navigation, dt, lineOfSight);
-            if (lineOfSight && enemy.canAttack()) beginCast(enemy, player, distance);
+            // 打不到玩家的时间只对首领有意义：它就是“该喊增援了”的计时器。
+            if (enemy.isBoss()) {
+                if (lineOfSight) enemy.resetSummonPressure();
+                else enemy.addSummonPressure(dt);
+            }
+            if (beginSummonIfDue(enemy, player)) continue;
+            if (lineOfSight && enemy.canAttack()) beginCast(enemy, player, chooseSkill(enemy, distance));
         }
+        // 首领一倒、或它跨界离开，它的造物与还没成型的裂隙一起溃散：
+        // 否则首领已经死了，裂隙还会吐出小怪，房间永远清不空，传送门也就不会出现。
+        if (bossFell || bossCrossedOver) collapseSummons();
+        updateSummonRifts(dt, navigation);
         updateEnemyAttacks(dt, player, navigation);
     }
 
@@ -493,13 +521,27 @@ public final class EnemySystem {
         return bestSide;
     }
 
+    /**
+     * 从随机出招表里挑一个当前距离可用、且不在冷却思路之外的技能。
+     *
+     * <p>召唤不算在这个表里：它由 {@link #beginSummonIfDue} 按“该不该喊人”单独判断，
+     * 混进随机轮换会让首领在玩家满血、场面干净的时候白白浪费一次召唤。
+     */
+    private EnemySkill chooseSkill(Enemy enemy, double distance) {
+        List<EnemySkill> choices = EnemySkill.forEnemy(enemy.getKind(), enemy.getWorld()).stream()
+                .filter(skill -> skill.pattern() != EnemySkill.Pattern.SUMMON)
+                .filter(skill -> distance <= skill.range()).toList();
+        if (choices.isEmpty()) return null;
+        return choices.get(Math.floorMod(enemy.nextSkillIndex(), choices.size()));
+    }
+
+    private void beginCast(Enemy enemy, Player player, EnemySkill skill) {
+        if (skill == null) return;
+        startCast(enemy, player, skill);
+    }
+
     /** 攻击严格按“前摇 → 出招（只触发一次释放）→ 收招”播放，逻辑事件不依赖渲染帧。 */
-    private void beginCast(Enemy enemy, Player player, double distance) {
-        List<EnemySkill> choices = EnemySkill.forEnemy(enemy.getKind(), enemy.getWorld());
-        if (choices.isEmpty()) return;
-        List<EnemySkill> eligible = choices.stream().filter(skill -> distance <= skill.range()).toList();
-        if (eligible.isEmpty()) return;
-        EnemySkill skill = eligible.get(Math.floorMod(enemy.nextSkillIndex(), eligible.size()));
+    private void startCast(Enemy enemy, Player player, EnemySkill skill) {
         double dx = player.getX() - enemy.getX(), dy = player.getY() - enemy.getY();
         enemy.setFacingFromVector(dx, dy);
         enemy.playAnimation(skill.actionBase() + "_windup", skill.windup(), false);
@@ -512,6 +554,139 @@ public final class EnemySystem {
         };
         if (!charge.isEmpty()) visualEffects.add(new EnemyVisualEffect(enemy.getKind(), enemy.getWorld(), charge,
                 enemy.getX(), enemy.getY() - 24, 0.0, enemy.isBoss() ? 176 : 100, skill.windup()));
+    }
+
+    /**
+     * 首领的召唤判定：三种“适时”条件满足任意一条就起手召唤。
+     *
+     * <ol>
+     *   <li><b>血量阶段</b>：血量第一次跌破 {@link #SUMMON_STAGE_HP} 里的比例，立刻召唤一次，且无视冷却；</li>
+     *   <li><b>逼出掩体</b>：连续 {@link GameConfig#WATCHER_SUMMON_PRESSURE_TIME} 秒打不到玩家，
+     *       就把小怪放出去——它们身位小、跑得快，能钻首领自己进不去的缝；</li>
+     *   <li><b>补位</b>：场上一个召唤物都不剩时再来一波，冷却决定节奏。</li>
+     * </ol>
+     *
+     * <p>后两条受冷却与 {@link GameConfig#WATCHER_SUMMON_MAX_ALIVE} 限制；阶段召唤只受存活上限限制，
+     * 且被上限挡住时不推进阶段，等位置空出来照样补上。
+     *
+     * @return 本帧是否已经起手召唤（起手后不再走普通攻击）
+     */
+    private boolean beginSummonIfDue(Enemy boss, Player player) {
+        if (!boss.isBoss() || activeCasts.containsKey(boss)) return false;
+        int load = summonLoad();
+        if (load >= GameConfig.WATCHER_SUMMON_MAX_ALIVE) return false;
+        boolean stageDue = boss.getSummonStage() < SUMMON_STAGE_HP.length
+                && boss.getHp() <= boss.getMaxHp() * SUMMON_STAGE_HP[boss.getSummonStage()];
+        boolean pressureDue = boss.getSummonPressure() >= GameConfig.WATCHER_SUMMON_PRESSURE_TIME;
+        boolean reinforcementDue = load == 0;
+        if (!stageDue && !pressureDue && !reinforcementDue) return false;
+        if (!stageDue && boss.getSummonCooldown() > 0.0) return false;
+        EnemySkill summon = EnemySkill.forEnemy(EnemyKind.WATCHER, boss.getWorld()).stream()
+                .filter(skill -> skill.pattern() == EnemySkill.Pattern.SUMMON).findFirst().orElse(null);
+        if (summon == null) return false;
+        if (stageDue) boss.advanceSummonStage();
+        boss.setSummonCooldown(GameConfig.WATCHER_SUMMON_COOLDOWN);
+        boss.resetSummonPressure();
+        startCast(boss, player, summon);
+        summonCallsSinceLastRead++;
+        return true;
+    }
+
+    /** 场上已经占掉的召唤名额：活着的召唤物 + 还没成型的裂隙。 */
+    private int summonLoad() {
+        return summonRifts.size() + (int) enemies.stream().filter(Enemy::isSummoned).count();
+    }
+
+    /** 该世界的召唤位序：第一只是本界的猎手，第二只是法师——行为差别明显，玩家一眼分得清。 */
+    private static EnemyKind summonKind(WorldType world, int index) {
+        if (index % 2 == 1) return EnemyKind.MAGE;
+        return world == WorldType.LIGHT ? EnemyKind.LANTERN : EnemyKind.WOLF;
+    }
+
+    /**
+     * 沿首领周围几圈找裂隙落点。
+     *
+     * <p>优先开在“首领与玩家之间”，像在包抄：这条规律玩家看得懂、也能提前让开，
+     * 比随机撒点更像“这招有章法”。落点必须放得下召唤物身位、离玩家有安全距离，
+     * 两个裂隙之间也要留出间距，免得两只怪叠在同一个点上。
+     */
+    private List<double[]> findSummonSpots(Enemy boss, Player player, RoomNavigationSystem navigation, int count) {
+        List<double[]> spots = new ArrayList<>();
+        double toPlayer = Math.atan2(player.getY() - boss.getY(), player.getX() - boss.getX());
+        double minRing = GameConfig.WATCHER_SUMMON_RIFT_MIN_DISTANCE;
+        double maxRing = Math.max(minRing, GameConfig.WATCHER_SUMMON_RIFT_MAX_DISTANCE);
+        double ringStep = Math.max(24.0, (maxRing - minRing) / 3.0);
+        for (double ring = minRing; ring <= maxRing + 1e-6 && spots.size() < count; ring += ringStep) {
+            List<Double> angles = new ArrayList<>();
+            int samples = 24;
+            for (int i = 0; i < samples; i++) angles.add(toPlayer + Math.PI * 2 * i / samples);
+            angles.sort(Comparator.comparingDouble(angle -> angleDifference(angle, toPlayer)));
+            for (double angle : angles) {
+                if (spots.size() >= count) break;
+                double x = boss.getX() + Math.cos(angle) * ring;
+                double y = boss.getY() + Math.sin(angle) * ring;
+                if (Math.hypot(x - player.getX(), y - player.getY()) < GameConfig.WATCHER_SUMMON_PLAYER_CLEARANCE) continue;
+                if (!navigation.canOccupy(x, y, radiusOf(summonKind(boss.getWorld(), spots.size())), boss.getWorld())) continue;
+                if (spots.stream().anyMatch(spot -> Math.hypot(spot[0] - x, spot[1] - y)
+                        < GameConfig.WATCHER_SUMMON_RIFT_SPACING)) continue;
+                spots.add(new double[]{x, y});
+            }
+        }
+        return spots;
+    }
+
+    /** 两个角度之间的最小夹角（弧度，恒为非负）。 */
+    private static double angleDifference(double a, double b) {
+        double difference = Math.abs(a - b) % (Math.PI * 2);
+        return Math.min(difference, Math.PI * 2 - difference);
+    }
+
+    /**
+     * 裂隙成型：在裂隙位置放出召唤物，并留下一圈迸发特效。
+     *
+     * <p>召唤物的世界、层数与难度都继承首领，只有生命值按 {@link GameConfig#WATCHER_SUMMON_HP_SCALE} 打折；
+     * 成型后还有一段起手时间，刚钻出来不会立刻贴脸开火。
+     */
+    private void updateSummonRifts(double dt, RoomNavigationSystem navigation) {
+        if (summonRifts.isEmpty()) return;
+        for (var iterator = summonRifts.iterator(); iterator.hasNext();) {
+            SummonRift rift = iterator.next();
+            rift.update(dt);
+            if (!rift.isReady()) continue;
+            iterator.remove();
+            Enemy minion = Enemy.summoned(rift.kind(), rift.world(), rift.x(), rift.y(), floor, difficulty,
+                    GameConfig.WATCHER_SUMMON_HP_SCALE);
+            double radius = radiusOf(minion.getKind());
+            double[] landing = navigation.findNearestSafePosition(rift.x(), rift.y(), rift.world(), radius);
+            if (landing == null) continue;   // 周围实在站不下就不放，绝不把召唤物塞进墙里
+            minion.setPosition(landing[0], landing[1]);
+            minion.setAlertRemaining(GameConfig.WATCHER_SUMMON_ALERT);
+            enemies.add(minion);
+            visualEffects.add(new EnemyVisualEffect(EnemyKind.WATCHER, rift.world(), "summon_portal",
+                    landing[0], landing[1], 0.0, 190, .40));
+        }
+    }
+
+    /**
+     * 首领的造物一同溃散：首领倒下、或它离开某一界时都会调用。
+     *
+     * <p>未成型的裂隙必须一起清掉——否则首领已经死了，裂隙还会吐出小怪，房间永远清不空。
+     * 溃散不计入击杀，玩家不会因为首领倒下白拿金币与相位能量。
+     */
+    private void collapseSummons() {
+        for (var iterator = enemies.iterator(); iterator.hasNext();) {
+            Enemy enemy = iterator.next();
+            if (!enemy.isSummoned()) continue;
+            visualEffects.add(new EnemyVisualEffect(EnemyKind.WATCHER, enemy.getWorld(), "phase_transition",
+                    enemy.getX(), enemy.getY(), 0.0, 150, .40));
+            activeCasts.remove(enemy);
+            iterator.remove();
+        }
+        for (SummonRift rift : summonRifts) {
+            visualEffects.add(new EnemyVisualEffect(EnemyKind.WATCHER, rift.world(), "phase_transition",
+                    rift.x(), rift.y(), 0.0, 150, .40));
+        }
+        summonRifts.clear();
     }
 
     private boolean advanceCast(Enemy enemy, Player player, RoomNavigationSystem navigation) {
@@ -570,7 +745,7 @@ public final class EnemySystem {
             }
             case RING_AREA -> radial(enemy, skill, 9, cast.angle);
             case DASH, DASH_NO_DAMAGE -> dash(enemy, skill, cast.angle, navigation);
-            case SUMMON -> summonWolves(enemy, player, navigation);
+            case SUMMON -> summonMinions(enemy, player, navigation);
         }
     }
 
@@ -597,10 +772,22 @@ public final class EnemySystem {
         // 也不会因“生成即撞到玩家、同一逻辑帧删除”而让攻击在渲染层完全看不见。
         if (skill.pattern() == EnemySkill.Pattern.DASH) area(enemy, skill, enemy.getX(), enemy.getY(), .15, .05);
     }
-    private void summonWolves(Enemy enemy, Player player, RoomNavigationSystem navigation) {
-        if (enemies.stream().filter(other -> other.getKind() == EnemyKind.WOLF && other.getWorld() == WorldType.SHADOW).count() >= 2) return;
-        Enemy wolf = new Enemy(EnemyKind.WOLF, WorldType.SHADOW, enemy.getX() + 90, enemy.getY(), floor);
-        if (navigation.canOccupy(wolf.getX(), wolf.getY(), enemyRadius(wolf), WorldType.SHADOW)) enemies.add(wolf);
+    /**
+     * 打开召唤裂隙：不直接生成召唤物，只在预定落点留下几道正在成型的裂隙。
+     *
+     * <p>数量受 {@link GameConfig#WATCHER_SUMMON_MAX_ALIVE} 限制——场上（连同未成型的裂隙）
+     * 已经站满时这一波就地取消，召唤不是刷怪机器。
+     */
+    private void summonMinions(Enemy boss, Player player, RoomNavigationSystem navigation) {
+        int slots = GameConfig.WATCHER_SUMMON_MAX_ALIVE - summonLoad();
+        int count = Math.min(GameConfig.WATCHER_SUMMON_COUNT, Math.max(0, slots));
+        if (count <= 0) return;
+        List<double[]> spots = findSummonSpots(boss, player, navigation, count);
+        for (int i = 0; i < spots.size(); i++) {
+            double[] spot = spots.get(i);
+            summonRifts.add(new SummonRift(summonKind(boss.getWorld(), i), boss.getWorld(), spot[0], spot[1],
+                    GameConfig.WATCHER_SUMMON_RIFT_TIME));
+        }
     }
 
     private static final class ActiveCast {
@@ -657,7 +844,8 @@ public final class EnemySystem {
     }
     public void spawnEventEnemies(Room room, long seed, Player player, RoomNavigationSystem navigation) {
         Random random = new Random(seed ^ room.id() * 0x51ED270BL);
-        enemies.clear(); attacks.clear(); visualEffects.clear(); activeCasts.clear(); activeRoomId = room.id();
+        enemies.clear(); attacks.clear(); visualEffects.clear(); summonRifts.clear();
+        activeCasts.clear(); activeRoomId = room.id();
         int count = 2 + random.nextInt(2);
         for (int i = 0; i < count; i++) {
             EnemyKind kind = i == 0 ? EnemyKind.WOLF : EnemyKind.LANTERN;
@@ -667,6 +855,16 @@ public final class EnemySystem {
     public boolean isRoomCleared() { return enemies.isEmpty(); }
     public int getCount(WorldType world) { return (int) enemies.stream().filter(enemy -> enemy.getWorld() == world).count(); }
     public int consumeKills() { int result = killsSinceLastRead; killsSinceLastRead = 0; return result; }
+
+    /** 自上帧以来首领起手召唤的次数：会话层据此提醒玩家“增援来了”。 */
+    public int consumeSummonCalls() { int result = summonCallsSinceLastRead; summonCallsSinceLastRead = 0; return result; }
+
+    /** 场上还活着的召唤物数量（不含未成型的裂隙）。 */
+    public int getSummonedCount() { return (int) enemies.stream().filter(Enemy::isSummoned).count(); }
+
+    /** 正在成型、尚未放出召唤物的裂隙。 */
+    public List<SummonRift> getSummonRifts() { return Collections.unmodifiableList(summonRifts); }
+
     public List<Enemy> getEnemies() { return Collections.unmodifiableList(enemies); }
     public List<EnemyAttack> getAttacks() { return Collections.unmodifiableList(attacks); }
     public List<EnemyVisualEffect> getVisualEffects() { return Collections.unmodifiableList(visualEffects); }
@@ -704,5 +902,10 @@ public final class EnemySystem {
         };
     }
 
-    private static double enemyRadius(Enemy enemy) { return enemy.isBoss() ? 46.0 : enemy.getKind().elite() ? 34.0 : 27.0; }
+    private static double enemyRadius(Enemy enemy) { return radiusOf(enemy.getKind()); }
+
+    /** 物种真实身位半径：首领 46、精英 34、普通怪 27。 */
+    private static double radiusOf(EnemyKind kind) {
+        return kind == EnemyKind.WATCHER ? 46.0 : kind.elite() ? 34.0 : 27.0;
+    }
 }

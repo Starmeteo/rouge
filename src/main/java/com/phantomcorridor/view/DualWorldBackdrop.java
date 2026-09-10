@@ -8,7 +8,8 @@ import javafx.scene.canvas.GraphicsContext;
 import javafx.scene.paint.Color;
 import javafx.scene.paint.CycleMethod;
 import javafx.scene.paint.LinearGradient;
-import javafx.scene.paint.RadialGradient;
+// 未使用（IDE 的 Unused import 会报）：双界背景只用线性渐变，径向光晕由几何绘制实现。
+// import javafx.scene.paint.RadialGradient;
 import javafx.scene.paint.Stop;
 
 import java.util.Random;

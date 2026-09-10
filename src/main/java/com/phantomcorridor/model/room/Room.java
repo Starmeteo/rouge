@@ -1,7 +1,8 @@
 package com.phantomcorridor.model.room;
 
 import com.phantomcorridor.model.RoomType;
-import com.phantomcorridor.model.WorldType;
+// 未使用（IDE 的 Unused import 会报）：房间自身不区分世界，某面墙属于哪一界由 Wall.world 决定。
+// import com.phantomcorridor.model.WorldType;
 
 import java.util.*;
 

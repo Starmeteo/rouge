@@ -124,6 +124,39 @@ class GameSessionTest {
     }
 
     @Test
+    void bossSummonsReinforcementsAndTheyVanishWhenItFalls() {
+        GameSession session = new GameSession();
+        session.newRun("2024");
+        enterFloorBossRoom(session);
+        Enemy boss = session.getEnemies().getEnemies().getFirst();
+        assertTrue(boss.isBoss());
+        // 打到第一阶段以下：召唤不再等开场缓冲。
+        boss.damage(boss.getMaxHp() * 30 / 100 + 1);
+
+        boolean riftsSeen = false;
+        for (int frame = 0; frame < 8 * 60 && !riftsSeen; frame++) {
+            update(session);
+            riftsSeen = !session.getSummonRifts().isEmpty();
+        }
+        assertTrue(riftsSeen, "首领跌破血量阶段时应当撕开召唤裂隙");
+        assertTrue(session.getRoomAnnouncement().contains("召唤"),
+                "召唤要给玩家一条即时提示，实际：" + session.getRoomAnnouncement());
+
+        for (int frame = 0; frame < 4 * 60 && session.getSummonedCount() == 0; frame++) update(session);
+        assertEquals(GameConfig.WATCHER_SUMMON_COUNT, session.getSummonedCount(), "裂隙成型后放出召唤物");
+        assertEquals(3, session.getLightEnemyCount(), "HUD 的残敌数必须把召唤物算进去：首领 + 两只增援");
+
+        // 只打死首领：它的造物要跟着溃散，房间照样立刻清空、传送门照常出现。
+        for (Enemy enemy : new ArrayList<>(session.getEnemies().getEnemies())) {
+            if (enemy.isBoss()) enemy.damage(999);
+        }
+        for (int frame = 0; frame < 5; frame++) update(session);
+
+        assertEquals(0, session.getSummonedCount(), "首领倒下时召唤物应当一并溃散");
+        assertTrue(session.getNavigation().getCurrentRoom().isCleared(), "首领清空后房间应当标记为已清空");
+    }
+
+    @Test
     void startPositionOnTheFirstFloorIsAnnounced() {
         GameSession session = new GameSession();
         session.newRun("2024");
