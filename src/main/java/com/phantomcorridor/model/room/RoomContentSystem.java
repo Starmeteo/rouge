@@ -206,7 +206,9 @@ public final class RoomContentSystem {
             case COIN -> player.addCoins(pickup.amount());
             case PHASE_FRAGMENT -> player.restorePhaseEnergy(
                     GameConfig.PHASE_ENERGY_PER_FRAGMENT * Math.max(1, pickup.amount()));
-            case HEALTH -> player.restoreHealth(Math.max(1, pickup.amount()));
+            // 药剂按“瓶”算：一瓶回复 PLAYER_HEAL_PER_PICKUP 点生命，
+            // 拾取物里的 amount 是瓶数，不随玩家最大生命（100 点）的刻度一起变形。
+            case HEALTH -> player.restoreHealthByPickups(Math.max(1, pickup.amount()));
             case ITEM -> player.addItem(ItemType.values()[Math.floorMod(pickup.amount(), ItemType.values().length)]);
             case EQUIPMENT -> player.equip(
                     EquipmentType.values()[Math.floorMod(pickup.amount(), EquipmentType.values().length)]);
