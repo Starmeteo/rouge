@@ -87,7 +87,44 @@ class GameSessionTest {
     }
 
     @Test
-    void aNewRunStartsOnTheFirstFloorAndAnnouncesIt() {
+    void difficultyIsChosenAtRunStartAndDrivesEnemyStats() {
+        GameSession normal = new GameSession();
+        normal.newRun("2024", Difficulty.NORMAL);
+        GameSession insane = new GameSession();
+        insane.newRun("2024", Difficulty.INSANE);
+
+        assertEquals(Difficulty.NORMAL, normal.getDifficulty());
+        assertEquals(Difficulty.INSANE, insane.getDifficulty());
+
+        // 同一个种子、同一批敌人：屌炸天那局每个敌人的生命值都必须更高。
+        var normalEnemies = normal.getEnemies().getEnemies();
+        var insaneEnemies = insane.getEnemies().getEnemies();
+        assertEquals(normalEnemies.size(), insaneEnemies.size());
+        for (int i = 0; i < normalEnemies.size(); i++) {
+            assertEquals(normalEnemies.get(i).getKind(), insaneEnemies.get(i).getKind());
+            assertTrue(insaneEnemies.get(i).getMaxHp() > normalEnemies.get(i).getMaxHp(),
+                    insaneEnemies.get(i).getKind() + " 在屌炸天下应当更肉");
+        }
+    }
+
+    @Test
+    void difficultySurvivesFloorChanges() {
+        GameSession session = new GameSession();
+        session.newRun("2024", Difficulty.HARD);
+
+        enterFloorBossRoom(session);
+        defeatTheBoss(session);
+        useThePortal(session);
+
+        assertEquals(2, session.getFloor());
+        assertEquals(Difficulty.HARD, session.getDifficulty(), "层数推进不应改变难度");
+        assertTrue(session.getEnemies().getFloor() == 2);
+        assertTrue(session.getEnemies().getEnemies().stream().allMatch(enemy -> enemy.getDifficulty() == Difficulty.HARD),
+                "新一层的敌人要按同一难度生成");
+    }
+
+    @Test
+    void startPositionOnTheFirstFloorIsAnnounced() {
         GameSession session = new GameSession();
         session.newRun("2024");
 

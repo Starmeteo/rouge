@@ -885,10 +885,10 @@ public final class GameRenderer {
         Player player = session.getPlayer();
 
         g.setFill(Color.rgb(4, 4, 8, 0.76));
-        g.fillRoundRect(56, 58, 370, 164, 16, 16);
+        g.fillRoundRect(56, 58, 470, 164, 16, 16);
         g.setStroke(Color.color(domain.getRed(), domain.getGreen(), domain.getBlue(), 0.55));
         g.setLineWidth(1.0);
-        g.strokeRoundRect(56, 58, 370, 164, 16, 16);
+        g.strokeRoundRect(56, 58, 470, 164, 16, 16);
 
         g.setFont(Font.font("Microsoft YaHei UI", FontWeight.BOLD, 17));
         g.setFill(Color.web("#efe7d8"));
@@ -897,10 +897,12 @@ public final class GameRenderer {
             g.setFill(i < player.getHp() ? Color.web("#d75b54") : Color.web("#3b2528"));
             g.fillOval(137 + i * 25.0, 76, 14, 14);
         }
-        // 当前层数放在第一行右侧：并进下面那行状态文字会顶出面板。
+        // 层数与难度放在第一行右侧：并进下面那行状态文字会顶出面板。
         g.setFill(domain);
         g.setFont(Font.font("Microsoft YaHei UI", FontWeight.BOLD, 15));
-        g.fillText("第 " + session.getFloor() + " / " + session.getTotalFloors() + " 层", 286, 91);
+        g.fillText("第 " + session.getFloor() + " / " + session.getTotalFloors() + " 层　·　"
+                + session.getDifficulty().displayName() + "（敌人 " + session.getDifficulty().percentText() + "）",
+                286, 91);
         g.setFont(Font.font("Microsoft YaHei UI", FontWeight.BOLD, 17));
 
         g.setFill(Color.rgb(111, 177, 255, 0.9));

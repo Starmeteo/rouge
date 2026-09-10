@@ -145,6 +145,12 @@
     -fx-translate-y: 1px;
 }
 
+/* 难度面板里当前生效的那一档：加一道金色描边便于识别 */
+.menu-button-current {
+    -fx-border-color: linear-gradient(to right, #e8bd68, #b98cff);
+    -fx-text-fill: #ffeec2;
+}
+
 .primary-button {
     -fx-border-color: linear-gradient(to right, #d9ad56, #9461cf);
 }
