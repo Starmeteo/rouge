@@ -11,6 +11,7 @@ import com.phantomcorridor.model.entity.Player;
 import com.phantomcorridor.model.entity.PlayerAnimationState;
 import com.phantomcorridor.model.combat.Projectile;
 import com.phantomcorridor.model.combat.EnemyAttack;
+import com.phantomcorridor.model.combat.EnemyVisualEffect;
 import com.phantomcorridor.model.combat.EnemyProjectile;
 import com.phantomcorridor.model.entity.Enemy;
 import com.phantomcorridor.model.entity.EnemyKind;
@@ -60,6 +61,7 @@ public final class GameRenderer {
     private static final Image WEAPON_ICONS = loadUiImage("weapons_v1.png");
     private static final Image EQUIPMENT_ICONS = loadUiImage("equipment_v1.png");
     private static final Map<String, Image> MONSTER_IMAGES = new HashMap<>();
+    private static final Map<String, Image[]> MONSTER_FRAME_SETS = new HashMap<>();
 
     public void render(GraphicsContext g, GameSession session, double fps) {
         g.setImageSmoothing(false);
@@ -178,12 +180,18 @@ public final class GameRenderer {
                 .filter(enemy -> enemy.getWorld() == currentWorld).sorted(Comparator.comparingDouble(Enemy::getY)).toList();
         for (Enemy enemy : visible) {
             String world = enemy.getWorld() == WorldType.LIGHT ? "light" : "shadow";
-            Image body = monsterImage("enemies/" + enemy.getKind().assetId() + "/" + world + "/idle/front_01.png");
-            double size = enemy.isBoss() ? 230 : enemy.getKind().elite() ? 154 : 118;
+            Image[] frames = monsterFrames("enemies/" + enemy.getKind().assetId() + "/" + world + "/"
+                    + enemy.getAnimationAction() + "/" + enemy.getFacing());
+            if (frames.length == 0) frames = monsterFrames("enemies/" + enemy.getKind().assetId() + "/" + world + "/idle/" + enemy.getFacing());
+            if (frames.length == 0) frames = monsterFrames("enemies/" + enemy.getKind().assetId() + "/" + world + "/idle/front");
+            Image body = animationFrame(frames, enemy.getAnimationTime(), enemy.getAnimationDuration(), enemy.isAnimationLooping(), 6.0);
+            double size = enemy.isBoss() ? 323 : enemy.getKind().elite() ? 230 : 179;
             double x = Math.rint(enemy.getX() - size / 2.0);
             if (body != null) {
                 double height = size * body.getHeight() / Math.max(1.0, body.getWidth());
-                g.drawImage(body, x, Math.rint(enemy.getY() - height * 0.70), size, height);
+                // 素材包根锚点统一在画布高度 87.5% 处，不能按可见包围盒重新计算，
+                // 否则挥臂、扑击和死亡帧会在地面上来回跳动。
+                g.drawImage(body, x, Math.rint(enemy.getY() - height * .875), size, height);
             } else {
                 g.setFill(enemy.getWorld() == WorldType.LIGHT ? LIGHT_GOLD : SHADOW_VIOLET);
                 g.fillRect(x, enemy.getY() - size / 2.0, size, size);
@@ -195,7 +203,7 @@ public final class GameRenderer {
     private void drawEnemyHealth(GraphicsContext g, Enemy enemy, Color domain) {
         double width = enemy.isBoss() ? 126 : 58;
         double x = enemy.getX() - width / 2.0;
-        double y = enemy.getY() - (enemy.isBoss() ? 120 : 66);
+        double y = enemy.getY() - (enemy.isBoss() ? 168 : enemy.getKind().elite() ? 124 : 96);
         g.setFill(Color.rgb(0, 0, 0, 0.68));
         g.fillRect(x, y, width, 6);
         g.setFill(Color.color(domain.getRed(), domain.getGreen(), domain.getBlue(), 0.92));
@@ -204,21 +212,22 @@ public final class GameRenderer {
 
     private void drawEnemyAttacks(GraphicsContext g, GameSession session, WorldType currentWorld) {
         for (EnemyAttack attack : session.getEnemies().getAttacks()) {
-            if (attack.getWorld() != currentWorld) continue;
-            String world = currentWorld == WorldType.LIGHT ? "light" : "shadow";
-            String effect = enemyEffect(attack.getSource(), currentWorld);
-            Image sprite = monsterImage("effects/" + attack.getSource().assetId() + "/" + world + "/" + effect + "/right_01.png");
-            double size = attack.getSource() == EnemyKind.WATCHER ? 84 : 54;
-            if (sprite != null) {
-                double height = size * sprite.getHeight() / Math.max(1.0, sprite.getWidth());
-                g.setGlobalBlendMode(BlendMode.ADD);
-                g.drawImage(sprite, attack.getX() - size / 2.0, attack.getY() - height / 2.0, size, height);
-                g.setGlobalBlendMode(BlendMode.SRC_OVER);
-            } else {
+            if (attack.getWorld() != currentWorld || !attack.isActive()) continue;
+            // 飞行攻击的碰撞半径保持原数值；只扩大独立美术帧，避免“看不见的小弹”
+            // 与实际判定不一致。不同弹种按轮廓复杂度给出不同的清晰显示尺寸。
+            double size = attack.isMoving() ? projectileVisualSize(attack) : Math.max(74, attack.getRadius() * 3.5);
+            if (!drawMonsterEffect(g, attack.getSource(), currentWorld, attack.getEffectId(), attack.getX(), attack.getY(),
+                    attack.getAngleRadians(), size, 0.20, .36)) {
                 g.setFill(currentWorld == WorldType.LIGHT ? Color.web("#fff0a2") : Color.web("#d59aff"));
                 g.fillOval(attack.getX() - attack.getRadius(), attack.getY() - attack.getRadius(),
                         attack.getRadius() * 2, attack.getRadius() * 2);
             }
+        }
+        for (EnemyVisualEffect effect : session.getEnemies().getVisualEffects()) {
+            if (effect.world() != currentWorld) continue;
+            if (effect.isBodyAnimation()) drawMonsterBodyEffect(g, effect);
+            else drawMonsterEffect(g, effect.source(), effect.world(), effect.effectId(),
+                    effect.x(), effect.y(), effect.angleRadians(), effect.size(), effect.age(), effect.duration());
         }
     }
 
@@ -405,17 +414,99 @@ public final class GameRenderer {
     private void drawDeathOverlay(GraphicsContext g, GameSession session) {
         g.setFill(Color.rgb(8, 4, 12, 0.78));
         g.fillRect(0, 0, AppConfig.VIEW_WIDTH, AppConfig.VIEW_HEIGHT);
+        double centerX = AppConfig.VIEW_WIDTH / 2.0;
+        double centerY = AppConfig.VIEW_HEIGHT / 2.0;
+        g.setFill(Color.rgb(18, 12, 28, .97));
+        g.fillRoundRect(centerX - 300, centerY - 160, 600, 330, 24, 24);
+        g.setStroke(Color.web("#a878c7")); g.setLineWidth(2.0);
+        g.strokeRoundRect(centerX - 300, centerY - 160, 600, 330, 24, 24);
         g.setTextAlign(TextAlignment.CENTER);
         g.setFill(Color.web("#f0d7e8"));
         g.setFont(Font.font("Microsoft YaHei UI", FontWeight.BOLD, 42));
         g.fillText("倒下了", AppConfig.VIEW_WIDTH / 2.0, AppConfig.VIEW_HEIGHT / 2.0 - 24);
         g.setFont(Font.font("Microsoft YaHei UI", 18));
         g.setFill(Color.web("#c9b4ca"));
-        g.fillText("第 " + session.getFloor() + " 层 · 金币 " + session.getCoins(),
+        g.fillText("第 " + session.getFloor() + " 层探索结束 · 金币 " + session.getCoins(),
                 AppConfig.VIEW_WIDTH / 2.0, AppConfig.VIEW_HEIGHT / 2.0 + 18);
-        g.setFont(Font.font("Microsoft YaHei UI", 16));
-        g.fillText("[R] 重新开始        [M] 返回主菜单", AppConfig.VIEW_WIDTH / 2.0, AppConfig.VIEW_HEIGHT / 2.0 + 62);
+        drawDeathButton(g, session, centerX - 170, centerY + 44, 140, 50, "重新开始", false);
+        drawDeathButton(g, session, centerX + 30, centerY + 44, 140, 50, "返回主菜单", true);
         g.setTextAlign(TextAlignment.LEFT);
+    }
+
+    /** 从独立 PNG 帧加载，不依赖旧版“固定四格图集”的假设。 */
+    private static Image[] monsterFrames(String directory) {
+        Image[] cached = MONSTER_FRAME_SETS.get(directory);
+        if (cached != null) return cached;
+        List<Image> frames = new ArrayList<>();
+        for (int i = 1; i <= 12; i++) {
+            Image image = monsterImage(directory + "_" + String.format("%02d", i) + ".png");
+            if (image == null) break;
+            frames.add(image);
+        }
+        cached = frames.toArray(Image[]::new);
+        MONSTER_FRAME_SETS.put(directory, cached);
+        return cached;
+    }
+
+    private static Image animationFrame(Image[] frames, double age, double duration, boolean loop, double fps) {
+        if (frames.length == 0) return null;
+        int index = loop ? (int) Math.floor(age * fps) % frames.length
+                : Math.min(frames.length - 1, (int) Math.floor(Math.min(1.0, age / Math.max(.01, duration)) * frames.length));
+        return frames[Math.max(0, index)];
+    }
+
+    private boolean drawMonsterEffect(GraphicsContext g, EnemyKind source, WorldType world, String effectId,
+                                      double x, double y, double angle, double size, double age, double duration) {
+        if (effectId == null || effectId.isBlank()) return false;
+        String form = world == WorldType.LIGHT ? "light" : "shadow";
+        Image sprite = animationFrame(monsterFrames("effects/" + source.assetId() + "/" + form + "/" + effectId + "/right"),
+                age, duration, false, 12.0);
+        if (sprite == null) return false;
+        double height = size * sprite.getHeight() / Math.max(1.0, sprite.getWidth());
+        g.save();
+        g.translate(x, y);
+        g.rotate(Math.toDegrees(angle));
+        g.setGlobalBlendMode(BlendMode.ADD);
+        g.drawImage(sprite, -size / 2.0, -height / 2.0, size, height);
+        g.setGlobalBlendMode(BlendMode.SRC_OVER);
+        g.restore();
+        return true;
+    }
+
+    private static double projectileVisualSize(EnemyAttack attack) {
+        return switch (attack.getSource()) {
+            case LANTERN -> attack.getEffectId().equals("dusk_needle") ? 126 : 148;
+            case MAGE -> 128;
+            case EXECUTIONER -> 184;
+            case BELL -> 122;
+            case WATCHER -> attack.getEffectId().equals("rift_spear") ? 210 : 134;
+            default -> Math.max(120, attack.getRadius() * 6.0);
+        };
+    }
+
+    /** 敌人死亡后实体可立即退出战斗逻辑，尸体仍以本体 death 帧完成一次播放。 */
+    private void drawMonsterBodyEffect(GraphicsContext g, EnemyVisualEffect effect) {
+        String form = effect.world() == WorldType.LIGHT ? "light" : "shadow";
+        Image sprite = animationFrame(monsterFrames("enemies/" + effect.source().assetId() + "/" + form + "/"
+                        + effect.effectId() + "/" + effect.facing()), effect.age(), effect.duration(), false, 6.0);
+        if (sprite == null) return;
+        double height = effect.size() * sprite.getHeight() / Math.max(1.0, sprite.getWidth());
+        g.drawImage(sprite, Math.rint(effect.x() - effect.size() / 2.0), Math.rint(effect.y() - height * .875),
+                effect.size(), height);
+    }
+
+    private void drawDeathButton(GraphicsContext g, GameSession session, double x, double y,
+                                 double width, double height, String label, boolean menu) {
+        boolean hover = session.getAimX() >= x && session.getAimX() <= x + width
+                && session.getAimY() >= y && session.getAimY() <= y + height;
+        g.setFill(Color.rgb(0, 0, 0, .35)); g.fillRoundRect(x + 4, y + 5, width, height, 10, 10);
+        Color base = menu ? Color.web("#6b4a92") : Color.web("#9a5d72");
+        g.setFill(hover ? base.brighter() : base);
+        g.fillRoundRect(x, y - (hover ? 2 : 0), width, height, 10, 10);
+        g.setStroke(hover ? Color.web("#fff0bd") : Color.web("#dcb8e5")); g.setLineWidth(2.0);
+        g.strokeRoundRect(x, y - (hover ? 2 : 0), width, height, 10, 10);
+        g.setFill(Color.web("#fff6e8")); g.setFont(Font.font("Microsoft YaHei UI", FontWeight.BOLD, 16));
+        g.fillText(label, x + width / 2.0, y + 31 - (hover ? 2 : 0));
     }
 
     /** 打通第五层、穿过最后一道裂隙后的通关界面。 */
