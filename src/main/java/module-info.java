@@ -8,6 +8,7 @@
 module com.phantomcorridor {
     requires javafx.controls;
     requires java.prefs;
+    requires java.desktop;
 
     exports com.phantomcorridor;
     exports com.phantomcorridor.core;

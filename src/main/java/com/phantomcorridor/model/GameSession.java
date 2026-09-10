@@ -9,6 +9,10 @@ import com.phantomcorridor.model.combat.EnemyProjectileSystem;
 import com.phantomcorridor.model.combat.EnemySystem;
 import com.phantomcorridor.model.dungeon.MapGenerator;
 import com.phantomcorridor.model.room.RoomNavigationSystem;
+import com.phantomcorridor.model.room.Room;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
 
 /** 一局游戏的聚合状态。后续房间、敌人、掉落都从这里接入。 */
 public final class GameSession {
@@ -27,6 +31,9 @@ public final class GameSession {
     private double roomAnnouncementRemaining;
     private boolean combatActive;
     private int coins;
+    private final List<Pickup> pickups = new ArrayList<>();
+    private boolean chestVisible;
+    private boolean chestOpened;
 
     public void newRun() { newRun(""); }
 
@@ -43,6 +50,7 @@ public final class GameSession {
         aimY = player.getY();
         combatActive = false;
         coins = 0;
+        pickups.clear(); chestVisible = false; chestOpened = false;
         dungeonSeed = MapGenerator.parseSeed(configuredSeed);
         navigation.reset(new MapGenerator().generate(dungeonSeed));
         navigation.placeAtEntrance(player);
@@ -62,6 +70,12 @@ public final class GameSession {
             enemies.enterRoom(navigation.getCurrentRoom(), dungeonSeed, player, navigation);
             roomAnnouncement = roomTypeLabel(navigation.getCurrentRoom().type());
             roomAnnouncementRemaining = 2.2;
+            enemies.enterRoom(navigation.getCurrentRoom());
+            pickups.clear(); chestVisible = false; chestOpened = false;
+            if (navigation.getCurrentRoom().type() == RoomType.REWARD) {
+                pickups.add(new Pickup(Pickup.Type.COIN, player.getX() + 36, player.getY(), 5));
+                pickups.add(new Pickup(Pickup.Type.PHASE_FRAGMENT, player.getX() - 36, player.getY(), 1));
+            }
         }
         attackSystem.update(dt, navigation);
         enemies.update(dt, player, attackSystem, navigation);
@@ -74,6 +88,16 @@ public final class GameSession {
         if (!combatActive) {
             player.restorePhaseEnergy(GameConfig.PHASE_ENERGY_REGEN_PER_SEC * dt);
         }
+        pickups.removeIf(p -> {
+            if (Math.hypot(p.x() - player.getX(), p.y() - player.getY()) > 42) return false;
+            if (p.type() == Pickup.Type.COIN) coins += p.amount();
+            else if (p.type() == Pickup.Type.PHASE_FRAGMENT) player.restorePhaseEnergy(GameConfig.PHASE_ENERGY_PER_FRAGMENT);
+            return true;
+        });
+        if (chestVisible && !chestOpened && Math.hypot(player.getX() - current.doorCenter(com.phantomcorridor.model.room.Direction.NORTH),
+                player.getY() - current.minY() - 70) < 80) chestOpened = true;
+        player.restorePhaseEnergy(GameConfig.PHASE_ENERGY_REGEN_PER_SEC * dt);
+        player.updateAttackCharges(dt);
         if (attacking) {
             attackSystem.tryAttack(player, aimX, aimY);
         }
@@ -108,6 +132,8 @@ public final class GameSession {
     public int getLightEnemyCount() { return enemies.getCount(WorldType.LIGHT); }
     public int getShadowEnemyCount() { return enemies.getCount(WorldType.SHADOW); }
     public int getCoins() { return coins; }
+    public List<Pickup> getPickups() { return Collections.unmodifiableList(pickups); }
+    public boolean isChestVisible() { return chestVisible && !chestOpened; }
     public RoomNavigationSystem getNavigation() { return navigation; }
     public long getDungeonSeed() { return dungeonSeed; }
     public boolean isRoomAnnouncementVisible() { return roomAnnouncementRemaining > 0.0; }

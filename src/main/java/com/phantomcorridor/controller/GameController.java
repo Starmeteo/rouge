@@ -75,7 +75,7 @@ public final class GameController {
             case S, DOWN -> input.setDown(true);
             case A, LEFT -> input.setLeft(true);
             case D, RIGHT -> input.setRight(true);
-            case SHIFT -> {
+            case TAB -> {
                 if (!shiftHeld && session.tryShiftWorld()) {
                     view.playWorldShift(session.getPlayer().getCurrentWorld());
                 }
@@ -92,7 +92,7 @@ public final class GameController {
             case S, DOWN -> input.setDown(false);
             case A, LEFT -> input.setLeft(false);
             case D, RIGHT -> input.setRight(false);
-            case SHIFT -> shiftHeld = false;
+            case TAB -> shiftHeld = false;
             default -> { }
         }
     }

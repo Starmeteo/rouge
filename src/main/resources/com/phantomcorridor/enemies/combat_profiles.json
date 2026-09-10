@@ -1,0 +1,795 @@
+{
+  "version": "1.0",
+  "status": "untested initial balance proposal",
+  "units": {
+    "P": "player standing body height",
+    "V": "player baseline movement speed",
+    "seconds": "simulation time"
+  },
+  "animationPlayback": "stretch each state clip to its configured duration; fire release once at windup end",
+  "inactiveWorldPolicy": {
+    "pauseAI": true,
+    "cancelUnreleasedAttack": true,
+    "clearHostileHazardsOnExit": true,
+    "alertSecondsOnReturn": 0.6
+  },
+  "boss": {
+    "phaseThreshold": 0.5,
+    "phase2WorldIntervalSeconds": 16,
+    "waitUntilRecoveryBeforeShift": true,
+    "transitionSeconds": 1.5,
+    "postShiftGraceSeconds": 2,
+    "guaranteeEnergyAtPlayerFeet": true,
+    "waitForPlayerToEnterWorld": true,
+    "sharedHealth": true
+  },
+  "skills": [
+    {
+      "enemy": "n01_lantern",
+      "form": "light",
+      "id": "seeker",
+      "name": "寻光球",
+      "windupSeconds": 0.65,
+      "activeSeconds": 0.12,
+      "recoverySeconds": 0.8,
+      "body": {
+        "windup": "attack_windup",
+        "release": "attack_release",
+        "recovery": "attack_recovery"
+      },
+      "effects": [
+        "charge",
+        "seeker_orb",
+        "orb_impact",
+        "orb_dissolve"
+      ],
+      "telegraph": "circle",
+      "world": "LIGHT",
+      "damage": 1,
+      "directionLockBeforeReleaseSeconds": 0.25,
+      "releaseEvent": {
+        "atSeconds": 0.65,
+        "fireOnce": true
+      },
+      "rules": {
+        "projectileCount": 1,
+        "speedV": 0.7,
+        "lifetimeSeconds": 3,
+        "homingSeconds": 0.8,
+        "maxTurnDegreesPerSecond": 90,
+        "blockedByWall": true,
+        "pulseClearable": true
+      }
+    },
+    {
+      "enemy": "n01_lantern",
+      "form": "shadow",
+      "id": "needles",
+      "name": "暮针",
+      "windupSeconds": 0.75,
+      "activeSeconds": 0.12,
+      "recoverySeconds": 1,
+      "body": {
+        "windup": "attack_windup",
+        "release": "attack_release",
+        "recovery": "attack_recovery"
+      },
+      "effects": [
+        "charge",
+        "dusk_needle",
+        "needle_impact",
+        "needle_dissolve"
+      ],
+      "telegraph": "sector30",
+      "world": "SHADOW",
+      "damage": 1,
+      "directionLockBeforeReleaseSeconds": 0.25,
+      "releaseEvent": {
+        "atSeconds": 0.75,
+        "fireOnce": true
+      },
+      "rules": {
+        "projectileCount": 3,
+        "spreadDegrees": 30,
+        "speedV": 1,
+        "lifetimeSeconds": 2.5,
+        "blockedByWall": true,
+        "pulseClearable": true
+      }
+    },
+    {
+      "enemy": "n02_wolf",
+      "form": "light",
+      "id": "pounce",
+      "name": "晶牙扑击",
+      "windupSeconds": 0.8,
+      "activeSeconds": 0.3,
+      "recoverySeconds": 0.85,
+      "body": {
+        "windup": "attack_windup",
+        "release": "attack_release",
+        "recovery": "attack_recovery"
+      },
+      "effects": [
+        "bite_flash",
+        "dash_dust",
+        "bite_impact",
+        "dash_dissolve"
+      ],
+      "telegraph": "line",
+      "world": "LIGHT",
+      "damage": 1,
+      "directionLockBeforeReleaseSeconds": 0.25,
+      "releaseEvent": {
+        "atSeconds": 0.8,
+        "fireOnce": true
+      },
+      "rules": {
+        "distanceP": 2.4,
+        "hitOnce": true,
+        "stopOnWall": true,
+        "contactDamageOutsideAttack": false
+      }
+    },
+    {
+      "enemy": "n02_wolf",
+      "form": "shadow",
+      "id": "dash_bite",
+      "name": "掠影撕咬",
+      "windupSeconds": 0.65,
+      "activeSeconds": 0.25,
+      "recoverySeconds": 1,
+      "body": {
+        "windup": "attack_windup",
+        "release": "attack_release",
+        "recovery": "attack_recovery"
+      },
+      "effects": [
+        "bite_arc",
+        "shadow_trail",
+        "bite_impact",
+        "trail_dissolve"
+      ],
+      "telegraph": "line",
+      "world": "SHADOW",
+      "damage": 1,
+      "directionLockBeforeReleaseSeconds": 0.25,
+      "releaseEvent": {
+        "atSeconds": 0.65,
+        "fireOnce": true
+      },
+      "rules": {
+        "distanceP": 3,
+        "hitOnce": true,
+        "stopOnWall": true,
+        "contactDamageOutsideAttack": false
+      }
+    },
+    {
+      "enemy": "n03_golem",
+      "form": "light",
+      "id": "earth_crack",
+      "name": "裂地锤",
+      "windupSeconds": 1,
+      "activeSeconds": 0.51,
+      "recoverySeconds": 1.1,
+      "body": {
+        "windup": "attack_windup",
+        "release": "attack_release",
+        "recovery": "attack_recovery"
+      },
+      "effects": [
+        "ground_crack",
+        "slam_sector",
+        "stone_burst",
+        "crack_dissolve"
+      ],
+      "telegraph": "line",
+      "world": "LIGHT",
+      "damage": 1,
+      "directionLockBeforeReleaseSeconds": 0.25,
+      "releaseEvent": {
+        "atSeconds": 1,
+        "fireOnce": true
+      },
+      "rules": {
+        "segments": 3,
+        "segmentDelaySeconds": 0.18,
+        "segmentActiveSeconds": 0.15,
+        "hitOncePerCast": true,
+        "pulseClearable": false
+      }
+    },
+    {
+      "enemy": "n03_golem",
+      "form": "shadow",
+      "id": "slam",
+      "name": "扇面重砸",
+      "windupSeconds": 0.9,
+      "activeSeconds": 0.15,
+      "recoverySeconds": 1.2,
+      "body": {
+        "windup": "attack_windup",
+        "release": "attack_release",
+        "recovery": "attack_recovery"
+      },
+      "effects": [
+        "slam_sector",
+        "ground_crack",
+        "dark_debris",
+        "slam_dissolve"
+      ],
+      "telegraph": "sector100",
+      "world": "SHADOW",
+      "damage": 1,
+      "directionLockBeforeReleaseSeconds": 0.25,
+      "releaseEvent": {
+        "atSeconds": 0.9,
+        "fireOnce": true
+      },
+      "rules": {
+        "radiusP": 1.15,
+        "angleDegrees": 100,
+        "hitOnce": true,
+        "pulseClearable": false
+      }
+    },
+    {
+      "enemy": "n04_mage",
+      "form": "light",
+      "id": "fan",
+      "name": "散辉",
+      "windupSeconds": 0.8,
+      "activeSeconds": 0.12,
+      "recoverySeconds": 0.9,
+      "body": {
+        "windup": "attack_windup",
+        "release": "attack_release",
+        "recovery": "attack_recovery"
+      },
+      "effects": [
+        "charge",
+        "fan_pellet",
+        "pellet_impact",
+        "shield_hit"
+      ],
+      "telegraph": "sector70",
+      "world": "LIGHT",
+      "damage": 1,
+      "directionLockBeforeReleaseSeconds": 0.25,
+      "releaseEvent": {
+        "atSeconds": 0.8,
+        "fireOnce": true
+      },
+      "rules": {
+        "projectileCount": 5,
+        "spreadDegrees": 70,
+        "speedV": 0.8,
+        "lifetimeSeconds": 3,
+        "guardReduction": 0.5,
+        "guardDisabledDuringAttack": true,
+        "pulseClearable": true
+      }
+    },
+    {
+      "enemy": "n04_mage",
+      "form": "shadow",
+      "id": "mirror_slash",
+      "name": "暗镜横切",
+      "windupSeconds": 0.85,
+      "activeSeconds": 0.15,
+      "recoverySeconds": 1.1,
+      "body": {
+        "windup": "attack_windup",
+        "release": "attack_release",
+        "recovery": "attack_recovery"
+      },
+      "effects": [
+        "charge",
+        "mirror_arc",
+        "mirror_impact",
+        "shield_hit"
+      ],
+      "telegraph": "sector120",
+      "world": "SHADOW",
+      "damage": 1,
+      "directionLockBeforeReleaseSeconds": 0.25,
+      "releaseEvent": {
+        "atSeconds": 0.85,
+        "fireOnce": true
+      },
+      "rules": {
+        "radiusP": 1.25,
+        "angleDegrees": 120,
+        "guardReduction": 0.5,
+        "guardDisabledDuringAttack": true,
+        "pulseClearable": false
+      }
+    },
+    {
+      "enemy": "e01_executioner",
+      "form": "light",
+      "id": "spear",
+      "name": "贯日投枪",
+      "windupSeconds": 1.1,
+      "activeSeconds": 0.15,
+      "recoverySeconds": 1,
+      "body": {
+        "windup": "attack_windup",
+        "release": "attack_release",
+        "recovery": "attack_recovery"
+      },
+      "effects": [
+        "spear_projectile",
+        "spear_impact",
+        "charge"
+      ],
+      "telegraph": "line",
+      "world": "LIGHT",
+      "damage": 1,
+      "directionLockBeforeReleaseSeconds": 0.25,
+      "releaseEvent": {
+        "atSeconds": 1.1,
+        "fireOnce": true
+      },
+      "rules": {
+        "speedV": 1.5,
+        "lifetimeSeconds": 3,
+        "pulseClearable": true,
+        "stopOnWall": true,
+        "weaponHiddenAfterRelease": true
+      }
+    },
+    {
+      "enemy": "e01_executioner",
+      "form": "light",
+      "id": "shield_bash",
+      "name": "震盾",
+      "windupSeconds": 0.9,
+      "activeSeconds": 0.15,
+      "recoverySeconds": 1,
+      "body": {
+        "windup": "shield_bash_windup",
+        "release": "shield_bash_release",
+        "recovery": "shield_bash_recovery"
+      },
+      "effects": [
+        "shield_sector",
+        "shield_impact"
+      ],
+      "telegraph": "sector100",
+      "world": "LIGHT",
+      "damage": 1,
+      "directionLockBeforeReleaseSeconds": 0.25,
+      "releaseEvent": {
+        "atSeconds": 0.9,
+        "fireOnce": true
+      },
+      "rules": {
+        "radiusP": 1.2,
+        "angleDegrees": 100,
+        "rangeConditionP": 1.3,
+        "pulseClearable": false
+      }
+    },
+    {
+      "enemy": "e01_executioner",
+      "form": "shadow",
+      "id": "judgment_combo",
+      "name": "二段裁决",
+      "windupSeconds": 0.9,
+      "activeSeconds": 0.6,
+      "recoverySeconds": 1.3,
+      "body": {
+        "windup": "attack_windup",
+        "release": "attack_release",
+        "recovery": "attack_recovery"
+      },
+      "effects": [
+        "cleave_arc",
+        "thrust_line",
+        "slash_impact",
+        "charge"
+      ],
+      "telegraph": "sector100",
+      "world": "SHADOW",
+      "damage": 1,
+      "directionLockBeforeReleaseSeconds": 0.25,
+      "releaseEvent": {
+        "atSeconds": 0.9,
+        "fireOnce": true
+      },
+      "rules": {
+        "hits": [
+          {
+            "afterReleaseSeconds": 0,
+            "shape": "sector100"
+          },
+          {
+            "afterReleaseSeconds": 0.45,
+            "shape": "line"
+          }
+        ],
+        "fixedComboDirection": true,
+        "pulseClearable": false
+      }
+    },
+    {
+      "enemy": "e01_executioner",
+      "form": "shadow",
+      "id": "approach",
+      "name": "短距逼近",
+      "windupSeconds": 0.8,
+      "activeSeconds": 0.3,
+      "recoverySeconds": 0.5,
+      "body": {
+        "windup": "approach_windup",
+        "release": "approach_release",
+        "recovery": "approach_recovery"
+      },
+      "effects": [
+        "dash_dust",
+        "trail_dissolve"
+      ],
+      "telegraph": "line",
+      "world": "SHADOW",
+      "damage": 0,
+      "directionLockBeforeReleaseSeconds": 0.25,
+      "releaseEvent": {
+        "atSeconds": 0.8,
+        "fireOnce": true
+      },
+      "rules": {
+        "damage": 0,
+        "distanceP": 2,
+        "minTargetDistanceP": 3,
+        "stopOnWall": true
+      }
+    },
+    {
+      "enemy": "e02_bell",
+      "form": "light",
+      "id": "sonic_ring",
+      "name": "缺口钟波",
+      "windupSeconds": 1.2,
+      "activeSeconds": 0.12,
+      "recoverySeconds": 1,
+      "body": {
+        "windup": "attack_windup",
+        "release": "attack_release",
+        "recovery": "attack_recovery"
+      },
+      "effects": [
+        "bell_pellet",
+        "charge",
+        "impact",
+        "dissolve"
+      ],
+      "telegraph": "ring_gap90",
+      "world": "LIGHT",
+      "damage": 1,
+      "directionLockBeforeReleaseSeconds": 0.25,
+      "releaseEvent": {
+        "atSeconds": 1.2,
+        "fireOnce": true
+      },
+      "rules": {
+        "radialSlots": 12,
+        "projectileCount": 9,
+        "safeGapDegrees": 90,
+        "speedV": 0.65,
+        "lifetimeSeconds": 3,
+        "pulseClearable": true
+      }
+    },
+    {
+      "enemy": "e02_bell",
+      "form": "light",
+      "id": "ground_mark",
+      "name": "落光印",
+      "windupSeconds": 1,
+      "activeSeconds": 0.15,
+      "recoverySeconds": 0.9,
+      "body": {
+        "windup": "ground_mark_windup",
+        "release": "ground_mark_release",
+        "recovery": "ground_mark_recovery"
+      },
+      "effects": [
+        "pillar_impact",
+        "impact"
+      ],
+      "telegraph": "circle",
+      "world": "LIGHT",
+      "damage": 1,
+      "directionLockBeforeReleaseSeconds": 0.25,
+      "releaseEvent": {
+        "atSeconds": 1,
+        "fireOnce": true
+      },
+      "rules": {
+        "radiusP": 0.8,
+        "lockGroundPositionAtWindupStart": true,
+        "pulseClearable": false
+      }
+    },
+    {
+      "enemy": "e02_bell",
+      "form": "shadow",
+      "id": "annular",
+      "name": "哑区震荡",
+      "windupSeconds": 1.1,
+      "activeSeconds": 0.2,
+      "recoverySeconds": 1.3,
+      "body": {
+        "windup": "attack_windup",
+        "release": "attack_release",
+        "recovery": "attack_recovery"
+      },
+      "effects": [
+        "annular_burst",
+        "charge",
+        "impact",
+        "dissolve"
+      ],
+      "telegraph": "annulus",
+      "world": "SHADOW",
+      "damage": 1,
+      "directionLockBeforeReleaseSeconds": 0.25,
+      "releaseEvent": {
+        "atSeconds": 1.1,
+        "fireOnce": true
+      },
+      "rules": {
+        "innerRadiusP": 1,
+        "outerRadiusP": 2.6,
+        "centerSafe": true,
+        "pulseClearable": false
+      }
+    },
+    {
+      "enemy": "e02_bell",
+      "form": "shadow",
+      "id": "ground_mark",
+      "name": "落影印",
+      "windupSeconds": 1,
+      "activeSeconds": 0.15,
+      "recoverySeconds": 0.9,
+      "body": {
+        "windup": "ground_mark_windup",
+        "release": "ground_mark_release",
+        "recovery": "ground_mark_recovery"
+      },
+      "effects": [
+        "pillar_impact",
+        "impact"
+      ],
+      "telegraph": "circle",
+      "world": "SHADOW",
+      "damage": 1,
+      "directionLockBeforeReleaseSeconds": 0.25,
+      "releaseEvent": {
+        "atSeconds": 1,
+        "fireOnce": true
+      },
+      "rules": {
+        "radiusP": 0.8,
+        "minTargetDistanceP": 2.6,
+        "lockGroundPositionAtWindupStart": true,
+        "exclusiveWith": "annular",
+        "pulseClearable": false
+      }
+    },
+    {
+      "enemy": "b01_watcher",
+      "form": "light",
+      "id": "solar_barrage",
+      "name": "日轮散射",
+      "windupSeconds": 1,
+      "activeSeconds": 0.57,
+      "recoverySeconds": 1.2,
+      "body": {
+        "windup": "attack_windup",
+        "release": "attack_release",
+        "recovery": "attack_recovery"
+      },
+      "effects": [
+        "sun_pellet",
+        "cast_charge",
+        "impact"
+      ],
+      "telegraph": "circle",
+      "world": "LIGHT",
+      "damage": 1,
+      "directionLockBeforeReleaseSeconds": 0.25,
+      "releaseEvent": {
+        "atSeconds": 1,
+        "fireOnce": true
+      },
+      "rules": {
+        "waves": 2,
+        "countPerWave": 8,
+        "waveDelaySeconds": 0.45,
+        "secondWaveOffsetDegrees": 22.5,
+        "speedV": 0.65,
+        "lifetimeSeconds": 3.5,
+        "pulseClearable": true
+      }
+    },
+    {
+      "enemy": "b01_watcher",
+      "form": "light",
+      "id": "judgment",
+      "name": "审判光柱",
+      "windupSeconds": 1.1,
+      "activeSeconds": 0.75,
+      "recoverySeconds": 1.2,
+      "body": {
+        "windup": "judgment_windup",
+        "release": "judgment_release",
+        "recovery": "judgment_recovery"
+      },
+      "effects": [
+        "pillar_impact",
+        "impact"
+      ],
+      "telegraph": "circle",
+      "world": "LIGHT",
+      "damage": 1,
+      "directionLockBeforeReleaseSeconds": 0.25,
+      "releaseEvent": {
+        "atSeconds": 1.1,
+        "fireOnce": true
+      },
+      "rules": {
+        "markCount": 3,
+        "radiusP": 0.65,
+        "spacingP": 1.5,
+        "delayBetweenMarksSeconds": 0.3,
+        "markActiveSeconds": 0.15,
+        "pulseClearable": false
+      }
+    },
+    {
+      "enemy": "b01_watcher",
+      "form": "light",
+      "id": "rift_spear",
+      "name": "裂隙光矛",
+      "windupSeconds": 1.2,
+      "activeSeconds": 0.15,
+      "recoverySeconds": 1.3,
+      "body": {
+        "windup": "rift_spear_windup",
+        "release": "rift_spear_release",
+        "recovery": "rift_spear_recovery"
+      },
+      "effects": [
+        "rift_spear",
+        "spear_impact",
+        "cast_charge"
+      ],
+      "telegraph": "line",
+      "world": "LIGHT",
+      "damage": 1,
+      "directionLockBeforeReleaseSeconds": 0.25,
+      "releaseEvent": {
+        "atSeconds": 1.2,
+        "fireOnce": true
+      },
+      "rules": {
+        "speedV": 1.4,
+        "lifetimeSeconds": 3.5,
+        "stopOnWall": true,
+        "pulseClearable": true
+      }
+    },
+    {
+      "enemy": "b01_watcher",
+      "form": "shadow",
+      "id": "double_slash",
+      "name": "裂影二连斩",
+      "windupSeconds": 1,
+      "activeSeconds": 0.65,
+      "recoverySeconds": 1.4,
+      "body": {
+        "windup": "attack_windup",
+        "release": "attack_release",
+        "recovery": "attack_recovery"
+      },
+      "effects": [
+        "slash_arc",
+        "slash_impact",
+        "cast_charge"
+      ],
+      "telegraph": "sector110",
+      "world": "SHADOW",
+      "damage": 1,
+      "directionLockBeforeReleaseSeconds": 0.25,
+      "releaseEvent": {
+        "atSeconds": 1,
+        "fireOnce": true
+      },
+      "rules": {
+        "radiusP": 1.8,
+        "angleDegrees": 110,
+        "hits": [
+          {
+            "afterReleaseSeconds": 0
+          },
+          {
+            "afterReleaseSeconds": 0.5
+          }
+        ],
+        "fixedComboDirection": true,
+        "pulseClearable": false
+      }
+    },
+    {
+      "enemy": "b01_watcher",
+      "form": "shadow",
+      "id": "dash",
+      "name": "断界突进",
+      "windupSeconds": 1,
+      "activeSeconds": 0.4,
+      "recoverySeconds": 1.4,
+      "body": {
+        "windup": "dash_windup",
+        "release": "dash_release",
+        "recovery": "dash_recovery"
+      },
+      "effects": [
+        "dash_trail",
+        "impact"
+      ],
+      "telegraph": "line",
+      "world": "SHADOW",
+      "damage": 1,
+      "directionLockBeforeReleaseSeconds": 0.25,
+      "releaseEvent": {
+        "atSeconds": 1,
+        "fireOnce": true
+      },
+      "rules": {
+        "distanceP": 4,
+        "widthP": 0.8,
+        "stopOnWall": true,
+        "hitOnce": true,
+        "pulseClearable": false
+      }
+    },
+    {
+      "enemy": "b01_watcher",
+      "form": "shadow",
+      "id": "summon",
+      "name": "唤影狼",
+      "windupSeconds": 1.2,
+      "activeSeconds": 0.1,
+      "recoverySeconds": 1.5,
+      "body": {
+        "windup": "summon_windup",
+        "release": "summon_release",
+        "recovery": "summon_recovery"
+      },
+      "effects": [
+        "summon_portal",
+        "cast_charge"
+      ],
+      "telegraph": "spawn_circle",
+      "world": "SHADOW",
+      "damage": 0,
+      "directionLockBeforeReleaseSeconds": 0.25,
+      "releaseEvent": {
+        "atSeconds": 1.2,
+        "fireOnce": true
+      },
+      "rules": {
+        "spawnEnemy": "n02_wolf",
+        "spawnForm": "shadow",
+        "spawnCap": 2,
+        "spawnAlertSeconds": 0.8,
+        "cooldownSeconds": 12,
+        "clearOnBossWorldExit": true
+      }
+    }
+  ]
+}

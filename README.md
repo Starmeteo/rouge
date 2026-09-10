@@ -177,6 +177,7 @@ src/main/resources
 - **碰撞集中化**：`util.CollisionUtil` 承载全部几何判定
 - **场景统一切换**：`SceneManager.switchTo(state, view)` 原子更新状态、界面与生命周期（§9.3）
 - **双世界契约**：`model.WorldType` 贯穿玩家/敌人/子弹，跨世界伤害与可见性由 `combat.DamageCalculator` 收敛
+- **敌人系统**：`combat.EnemySystem` 按房间生成敌人，`Enemy` 执行世界隔离的追击/前摇/释放/收招状态机；怪物素材位于 `resources/com/phantomcorridor/enemies/`
 
 ## 协作约定
 
