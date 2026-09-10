@@ -2,7 +2,6 @@ package com.phantomcorridor.model.room;
 
 import com.phantomcorridor.config.GameConfig;
 import com.phantomcorridor.config.RoomConfig;
-import com.phantomcorridor.model.RoomType;
 import com.phantomcorridor.model.WorldType;
 import com.phantomcorridor.model.dungeon.DungeonMap;
 import com.phantomcorridor.model.entity.Player;
@@ -133,10 +132,6 @@ public final class RoomNavigationSystem {
         }
         double[] safe = findNearestSafePosition(player.getX(), player.getY(), player.getCurrentWorld());
         if (safe != null) player.setPosition(safe[0], safe[1]);
-        // 第 6 天由存活敌人数接管；当前先保持整张地图可探索。
-        if (currentRoom.type() == RoomType.BATTLE || currentRoom.type() == RoomType.BOSS) {
-            currentRoom.setCleared(true);
-        }
     }
 
     private void discoverNeighbors(Room room) {

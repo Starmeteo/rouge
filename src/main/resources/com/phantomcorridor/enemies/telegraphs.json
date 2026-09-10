@@ -1,0 +1,362 @@
+[
+  {
+    "id": "light/circle",
+    "form": "light",
+    "shape": "circle",
+    "frames": [
+      "telegraphs/light/circle/01.png",
+      "telegraphs/light/circle/02.png",
+      "telegraphs/light/circle/03.png",
+      "telegraphs/light/circle/04.png"
+    ],
+    "width": 256,
+    "height": 256,
+    "pivot": [
+      128,
+      128
+    ],
+    "damage": false
+  },
+  {
+    "id": "light/line",
+    "form": "light",
+    "shape": "line",
+    "frames": [
+      "telegraphs/light/line/01.png",
+      "telegraphs/light/line/02.png",
+      "telegraphs/light/line/03.png",
+      "telegraphs/light/line/04.png"
+    ],
+    "width": 256,
+    "height": 256,
+    "pivot": [
+      128,
+      128
+    ],
+    "damage": false
+  },
+  {
+    "id": "light/sector30",
+    "form": "light",
+    "shape": "sector30",
+    "frames": [
+      "telegraphs/light/sector30/01.png",
+      "telegraphs/light/sector30/02.png",
+      "telegraphs/light/sector30/03.png",
+      "telegraphs/light/sector30/04.png"
+    ],
+    "width": 256,
+    "height": 256,
+    "pivot": [
+      128,
+      128
+    ],
+    "damage": false
+  },
+  {
+    "id": "light/sector70",
+    "form": "light",
+    "shape": "sector70",
+    "frames": [
+      "telegraphs/light/sector70/01.png",
+      "telegraphs/light/sector70/02.png",
+      "telegraphs/light/sector70/03.png",
+      "telegraphs/light/sector70/04.png"
+    ],
+    "width": 256,
+    "height": 256,
+    "pivot": [
+      128,
+      128
+    ],
+    "damage": false
+  },
+  {
+    "id": "light/sector100",
+    "form": "light",
+    "shape": "sector100",
+    "frames": [
+      "telegraphs/light/sector100/01.png",
+      "telegraphs/light/sector100/02.png",
+      "telegraphs/light/sector100/03.png",
+      "telegraphs/light/sector100/04.png"
+    ],
+    "width": 256,
+    "height": 256,
+    "pivot": [
+      128,
+      128
+    ],
+    "damage": false
+  },
+  {
+    "id": "light/sector110",
+    "form": "light",
+    "shape": "sector110",
+    "frames": [
+      "telegraphs/light/sector110/01.png",
+      "telegraphs/light/sector110/02.png",
+      "telegraphs/light/sector110/03.png",
+      "telegraphs/light/sector110/04.png"
+    ],
+    "width": 256,
+    "height": 256,
+    "pivot": [
+      128,
+      128
+    ],
+    "damage": false
+  },
+  {
+    "id": "light/sector120",
+    "form": "light",
+    "shape": "sector120",
+    "frames": [
+      "telegraphs/light/sector120/01.png",
+      "telegraphs/light/sector120/02.png",
+      "telegraphs/light/sector120/03.png",
+      "telegraphs/light/sector120/04.png"
+    ],
+    "width": 256,
+    "height": 256,
+    "pivot": [
+      128,
+      128
+    ],
+    "damage": false
+  },
+  {
+    "id": "light/annulus",
+    "form": "light",
+    "shape": "annulus",
+    "frames": [
+      "telegraphs/light/annulus/01.png",
+      "telegraphs/light/annulus/02.png",
+      "telegraphs/light/annulus/03.png",
+      "telegraphs/light/annulus/04.png"
+    ],
+    "width": 256,
+    "height": 256,
+    "pivot": [
+      128,
+      128
+    ],
+    "damage": false
+  },
+  {
+    "id": "light/ring_gap90",
+    "form": "light",
+    "shape": "ring_gap90",
+    "frames": [
+      "telegraphs/light/ring_gap90/01.png",
+      "telegraphs/light/ring_gap90/02.png",
+      "telegraphs/light/ring_gap90/03.png",
+      "telegraphs/light/ring_gap90/04.png"
+    ],
+    "width": 256,
+    "height": 256,
+    "pivot": [
+      128,
+      128
+    ],
+    "damage": false
+  },
+  {
+    "id": "light/spawn_circle",
+    "form": "light",
+    "shape": "spawn_circle",
+    "frames": [
+      "telegraphs/light/spawn_circle/01.png",
+      "telegraphs/light/spawn_circle/02.png",
+      "telegraphs/light/spawn_circle/03.png",
+      "telegraphs/light/spawn_circle/04.png"
+    ],
+    "width": 256,
+    "height": 256,
+    "pivot": [
+      128,
+      128
+    ],
+    "damage": false
+  },
+  {
+    "id": "shadow/circle",
+    "form": "shadow",
+    "shape": "circle",
+    "frames": [
+      "telegraphs/shadow/circle/01.png",
+      "telegraphs/shadow/circle/02.png",
+      "telegraphs/shadow/circle/03.png",
+      "telegraphs/shadow/circle/04.png"
+    ],
+    "width": 256,
+    "height": 256,
+    "pivot": [
+      128,
+      128
+    ],
+    "damage": false
+  },
+  {
+    "id": "shadow/line",
+    "form": "shadow",
+    "shape": "line",
+    "frames": [
+      "telegraphs/shadow/line/01.png",
+      "telegraphs/shadow/line/02.png",
+      "telegraphs/shadow/line/03.png",
+      "telegraphs/shadow/line/04.png"
+    ],
+    "width": 256,
+    "height": 256,
+    "pivot": [
+      128,
+      128
+    ],
+    "damage": false
+  },
+  {
+    "id": "shadow/sector30",
+    "form": "shadow",
+    "shape": "sector30",
+    "frames": [
+      "telegraphs/shadow/sector30/01.png",
+      "telegraphs/shadow/sector30/02.png",
+      "telegraphs/shadow/sector30/03.png",
+      "telegraphs/shadow/sector30/04.png"
+    ],
+    "width": 256,
+    "height": 256,
+    "pivot": [
+      128,
+      128
+    ],
+    "damage": false
+  },
+  {
+    "id": "shadow/sector70",
+    "form": "shadow",
+    "shape": "sector70",
+    "frames": [
+      "telegraphs/shadow/sector70/01.png",
+      "telegraphs/shadow/sector70/02.png",
+      "telegraphs/shadow/sector70/03.png",
+      "telegraphs/shadow/sector70/04.png"
+    ],
+    "width": 256,
+    "height": 256,
+    "pivot": [
+      128,
+      128
+    ],
+    "damage": false
+  },
+  {
+    "id": "shadow/sector100",
+    "form": "shadow",
+    "shape": "sector100",
+    "frames": [
+      "telegraphs/shadow/sector100/01.png",
+      "telegraphs/shadow/sector100/02.png",
+      "telegraphs/shadow/sector100/03.png",
+      "telegraphs/shadow/sector100/04.png"
+    ],
+    "width": 256,
+    "height": 256,
+    "pivot": [
+      128,
+      128
+    ],
+    "damage": false
+  },
+  {
+    "id": "shadow/sector110",
+    "form": "shadow",
+    "shape": "sector110",
+    "frames": [
+      "telegraphs/shadow/sector110/01.png",
+      "telegraphs/shadow/sector110/02.png",
+      "telegraphs/shadow/sector110/03.png",
+      "telegraphs/shadow/sector110/04.png"
+    ],
+    "width": 256,
+    "height": 256,
+    "pivot": [
+      128,
+      128
+    ],
+    "damage": false
+  },
+  {
+    "id": "shadow/sector120",
+    "form": "shadow",
+    "shape": "sector120",
+    "frames": [
+      "telegraphs/shadow/sector120/01.png",
+      "telegraphs/shadow/sector120/02.png",
+      "telegraphs/shadow/sector120/03.png",
+      "telegraphs/shadow/sector120/04.png"
+    ],
+    "width": 256,
+    "height": 256,
+    "pivot": [
+      128,
+      128
+    ],
+    "damage": false
+  },
+  {
+    "id": "shadow/annulus",
+    "form": "shadow",
+    "shape": "annulus",
+    "frames": [
+      "telegraphs/shadow/annulus/01.png",
+      "telegraphs/shadow/annulus/02.png",
+      "telegraphs/shadow/annulus/03.png",
+      "telegraphs/shadow/annulus/04.png"
+    ],
+    "width": 256,
+    "height": 256,
+    "pivot": [
+      128,
+      128
+    ],
+    "damage": false
+  },
+  {
+    "id": "shadow/ring_gap90",
+    "form": "shadow",
+    "shape": "ring_gap90",
+    "frames": [
+      "telegraphs/shadow/ring_gap90/01.png",
+      "telegraphs/shadow/ring_gap90/02.png",
+      "telegraphs/shadow/ring_gap90/03.png",
+      "telegraphs/shadow/ring_gap90/04.png"
+    ],
+    "width": 256,
+    "height": 256,
+    "pivot": [
+      128,
+      128
+    ],
+    "damage": false
+  },
+  {
+    "id": "shadow/spawn_circle",
+    "form": "shadow",
+    "shape": "spawn_circle",
+    "frames": [
+      "telegraphs/shadow/spawn_circle/01.png",
+      "telegraphs/shadow/spawn_circle/02.png",
+      "telegraphs/shadow/spawn_circle/03.png",
+      "telegraphs/shadow/spawn_circle/04.png"
+    ],
+    "width": 256,
+    "height": 256,
+    "pivot": [
+      128,
+      128
+    ],
+    "damage": false
+  }
+]

@@ -20,11 +20,17 @@ public final class GameController {
     private double aimX;
     private double aimY;
     private final Settings settings;
+    private final Runnable onMainMenu;
 
     public GameController(GameView view, Runnable onPauseRequested, Settings settings) {
+        this(view, onPauseRequested, settings, () -> { });
+    }
+
+    public GameController(GameView view, Runnable onPauseRequested, Settings settings, Runnable onMainMenu) {
         this.view = view;
         this.onPauseRequested = onPauseRequested;
         this.settings = settings;
+        this.onMainMenu = onMainMenu;
         this.loop = new GameLoop() {
             @Override
             protected void update(double dt) {
@@ -70,17 +76,23 @@ public final class GameController {
     }
 
     private void keyPressed(KeyCode key) {
+        if (session.getPlayer().getHp() <= 0) {
+            if (key == KeyCode.R) newRun();
+            else if (key == KeyCode.M) onMainMenu.run();
+            return;
+        }
         switch (key) {
             case W, UP -> input.setUp(true);
             case S, DOWN -> input.setDown(true);
             case A, LEFT -> input.setLeft(true);
             case D, RIGHT -> input.setRight(true);
-            case SHIFT -> {
+            case TAB -> {
                 if (!shiftHeld && session.tryShiftWorld()) {
                     view.playWorldShift(session.getPlayer().getCurrentWorld());
                 }
                 shiftHeld = true;
             }
+            case E -> session.requestInteract();
             case ESCAPE, P -> onPauseRequested.run();
             default -> { }
         }
@@ -92,7 +104,7 @@ public final class GameController {
             case S, DOWN -> input.setDown(false);
             case A, LEFT -> input.setLeft(false);
             case D, RIGHT -> input.setRight(false);
-            case SHIFT -> shiftHeld = false;
+            case TAB -> shiftHeld = false;
             default -> { }
         }
     }

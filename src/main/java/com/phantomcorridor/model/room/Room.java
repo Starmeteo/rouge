@@ -18,6 +18,7 @@ public final class Room {
     private boolean cleared;
     private boolean discovered;
     private boolean visited;
+    private boolean rewardClaimed;
 
     public Room(int id, RoomType type, int mapX, int mapY) {
         this(id, type, mapX, mapY, Objects.hash(id, type, mapX, mapY));
@@ -67,6 +68,8 @@ public final class Room {
     public boolean isVisited() { return visited; }
     public void discover() { discovered = true; }
     public void visit() { discovered = true; visited = true; }
+    public boolean isRewardClaimed() { return rewardClaimed; }
+    public void claimReward() { rewardClaimed = true; }
 
     public double minX() { return areas.stream().mapToDouble(RoomArea::x).min().orElseThrow(); }
     public double minY() { return areas.stream().mapToDouble(RoomArea::y).min().orElseThrow(); }
