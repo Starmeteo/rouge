@@ -27,6 +27,9 @@ import java.util.Random;
  * 被墙挡住视线时继续绕行接近、只有确实看得见玩家时才开火；玩家换界后敌人丢失目标，重新索敌。
  */
 public final class EnemySystem {
+    /** 一次裂隙闪现的视觉残留：起点、终点与剩余时间，供渲染层画裂隙特效。 */
+    public record BlinkFlash(double fromX, double fromY, double toX, double toY, double remaining) { }
+
     /**
      * 贴墙绕行的候选方向偏移（角度制），第 0 组对应 +1 侧、第 1 组对应 -1 侧。
      *
@@ -44,6 +47,11 @@ public final class EnemySystem {
     private final EnumMap<WorldType, Map<Integer, RoomFlowField>> flowFields = new EnumMap<>(WorldType.class);
     private int activeRoomId = -1;
     private int killsSinceLastRead;
+    private int floor = 1;
+    private BlinkFlash blinkFlash;
+
+    /** 最近一次裂隙闪现的特效状态；已结束时返回 null。 */
+    public BlinkFlash getBlinkFlash() { return blinkFlash; }
 
     public void reset() {
         enemies.clear();
@@ -54,6 +62,11 @@ public final class EnemySystem {
         activeRoomId = -1;
         killsSinceLastRead = 0;
     }
+
+    /** 当前层数：决定新生成敌人的生命值与防御。 */
+    public void setFloor(int floor) { this.floor = Math.max(1, floor); }
+
+    public int getFloor() { return floor; }
 
     /** 仅在未清理的战斗/Boss 房生成；Boss 房严格只生成一名首领。 */
     public void enterRoom(Room room, long dungeonSeed, Player player, RoomNavigationSystem navigation) {
@@ -85,7 +98,7 @@ public final class EnemySystem {
 
     private void spawn(EnemyKind kind, WorldType world, Room room, Player player,
                        RoomNavigationSystem navigation, Random random) {
-        Enemy enemy = new Enemy(kind, world, 0.0, 0.0);
+        Enemy enemy = new Enemy(kind, world, 0.0, 0.0, floor);
         // 必须按物种真实身位校验：首领 46、精英 34 都比普通怪大，
         // 用统一的小半径放行会让它们出生就压在墙上，之后一步都走不动。
         double radius = enemyRadius(enemy);
@@ -105,6 +118,7 @@ public final class EnemySystem {
 
     public void update(double dt, Player player, PlayerAttackSystem playerAttacks,
                        RoomNavigationSystem navigation) {
+        updateBlinkFlash(dt);
         resolvePlayerHits(player, playerAttacks);
         visualEffects.forEach(effect -> effect.update(dt));
         visualEffects.removeIf(EnemyVisualEffect::expired);
@@ -143,10 +157,140 @@ public final class EnemySystem {
             boolean lineOfSight = distance <= fireRange
                     && navigation.isSegmentClear(enemy.getX(), enemy.getY(),
                     player.getX(), player.getY(), GameConfig.ENEMY_PROJECTILE_RADIUS, enemy.getWorld());
+            maybeEscapeWedge(enemy, player, navigation, dt, distance, lineOfSight);
             moveTowardPlayer(enemy, player, navigation, dt, lineOfSight);
             if (lineOfSight && enemy.canAttack()) beginCast(enemy, player, distance);
         }
         updateEnemyAttacks(dt, player, navigation);
+    }
+
+    /** 裂隙特效只是视觉残留，按剩余时间自然消退。 */
+    private void updateBlinkFlash(double dt) {
+        if (blinkFlash == null) return;
+        double remaining = blinkFlash.remaining() - Math.max(0.0, dt);
+        blinkFlash = remaining <= 0.0 ? null
+                : new BlinkFlash(blinkFlash.fromX(), blinkFlash.fromY(),
+                blinkFlash.toX(), blinkFlash.toY(), remaining);
+    }
+
+    /**
+     * 被墙卡住时的脱困兜底。
+     *
+     * <p>玩家很爱把首领顶在墙角：它半径大、又刚好站在只有自己能站、却走不出去的死角里，
+     * 于是既追不上也打不到，被隔着墙磨死。这里持续跟踪“有没有更接近玩家”，
+     * 连续 {@link GameConfig#ENEMY_STUCK_TIME} 秒没有进步就把敌人挪到最近的、能继续推进的合法位置。
+     */
+    private void maybeEscapeWedge(Enemy enemy, Player player, RoomNavigationSystem navigation,
+                                  double dt, double distance, boolean lineOfSight) {
+        boolean wantsToClose = !lineOfSight || distance > standoffDistance(enemy.getKind());
+        if (!wantsToClose) {
+            // 站在开火站位上不靠近是正常行为，不算卡死。
+            enemy.resetProgressTracking(distance);
+            return;
+        }
+        // 首领额外看一条：玩家在它自己的寻路场里根本不可达（躲进了它挤不进去的角落）。
+        // 这时它只会绕着障碍转圈，光看“没挪动”是抓不到的。
+        boolean unreachable = enemy.isBoss()
+                && !flowFieldFor(enemy, player, navigation, enemyRadius(enemy))
+                .isReachable(enemy.getX(), enemy.getY());
+        if (!enemy.trackProgress(distance, dt, unreachable)) return;
+        // 守望者优先用裂隙闪现：既解决“被顶在墙角”，也解决“玩家躲进它挤不进去的角落”。
+        if (enemy.isBoss() && enemy.getBlinkCooldown() <= 0.0 && blinkWatcher(enemy, player, navigation)) return;
+        escapeWedge(enemy, player, navigation);
+    }
+
+    /**
+     * 守望者的短距裂隙闪现：撕开一道裂隙直接出现在玩家附近的合法位置。
+     *
+     * <p>只在“追不上或打不到玩家”且冷却结束时使用，落点优先能直接打到玩家，
+     * 落地后还有一段起手时间，避免贴脸瞬狙。
+     *
+     * @return 是否成功闪现
+     */
+    private boolean blinkWatcher(Enemy enemy, Player player, RoomNavigationSystem navigation) {
+        double radius = enemyRadius(enemy);
+        double[] landing = findBlinkLanding(enemy, player, navigation, radius);
+        if (landing == null) return false;
+        blinkFlash = new BlinkFlash(enemy.getX(), enemy.getY(), landing[0], landing[1],
+                GameConfig.WATCHER_BLINK_FLASH_TIME);
+        enemy.setPosition(landing[0], landing[1]);
+        enemy.clearAvoidance();
+        enemy.resetProgressTracking(Math.hypot(player.getX() - landing[0], player.getY() - landing[1]));
+        enemy.setBlinkCooldown(GameConfig.WATCHER_BLINK_COOLDOWN);
+        enemy.setAlertRemaining(GameConfig.WATCHER_BLINK_WINDUP);
+        return true;
+    }
+
+    /**
+     * 在玩家周围逐圈搜索闪现落点。
+     *
+     * <p>优先“落地就能打到玩家”的位置；一圈里没有这样的位置就继续往外找，
+     * 同时记住第一个站得下的位置作为兜底（玩家躲在死角里时只能落在附近）。
+     */
+    private double[] findBlinkLanding(Enemy enemy, Player player, RoomNavigationSystem navigation,
+                                      double radius) {
+        double[] fallback = null;
+        double step = GameConfig.ENEMY_ESCAPE_SEARCH_STEP;
+        for (double ring = GameConfig.WATCHER_BLINK_MIN_DISTANCE;
+             ring <= GameConfig.WATCHER_BLINK_SEARCH_RADIUS; ring += step) {
+            int samples = Math.max(16, (int) (Math.PI * ring / (step / 2)));
+            for (int i = 0; i < samples; i++) {
+                double angle = Math.PI * 2 * i / samples;
+                double x = player.getX() + Math.cos(angle) * ring;
+                double y = player.getY() + Math.sin(angle) * ring;
+                if (!navigation.canOccupy(x, y, radius, enemy.getWorld())) continue;
+                if (Math.hypot(x - enemy.getX(), y - enemy.getY()) > GameConfig.WATCHER_BLINK_RANGE) continue;
+                if (navigation.isSegmentClear(x, y, player.getX(), player.getY(),
+                        GameConfig.ENEMY_PROJECTILE_RADIUS, enemy.getWorld())) {
+                    return new double[]{x, y};
+                }
+                if (fallback == null) fallback = new double[]{x, y};
+            }
+        }
+        return fallback;
+    }
+
+    /** 找一个既放得下身位、又能继续朝玩家推进的位置把敌人挪过去。 */
+    private void escapeWedge(Enemy enemy, Player player, RoomNavigationSystem navigation) {
+        double radius = enemyRadius(enemy);
+        double[] escape = findEscapePosition(enemy, player, navigation, radius);
+        if (escape == null) return;
+        enemy.setPosition(escape[0], escape[1]);
+        enemy.clearAvoidance();
+        enemy.resetProgressTracking(Math.hypot(player.getX() - escape[0], player.getY() - escape[1]));
+    }
+
+    /**
+     * 逐圈向外搜索脱困落点。
+     *
+     * <p>优先级：①走得过去、且距离场给得出方向的位置（真正脱困）；②走得过去的位置（至少挪出死角）；
+     * ③自己已经嵌进墙体里时，允许就近弹出一点点。绝不接受“隔着墙跳过去”——那样敌人会瞬移到
+     * 玩家躲着的死胡同里，看起来像穿墙挂。
+     */
+    private double[] findEscapePosition(Enemy enemy, Player player, RoomNavigationSystem navigation,
+                                        double radius) {
+        RoomFlowField field = flowFieldFor(enemy, player, navigation, radius);
+        double[] reachable = null;
+        double[] popOut = null;
+        double popLimit = radius * 2.0;
+        for (double ring = GameConfig.ENEMY_ESCAPE_SEARCH_STEP;
+             ring <= GameConfig.ENEMY_ESCAPE_SEARCH_RADIUS;
+             ring += GameConfig.ENEMY_ESCAPE_SEARCH_STEP) {
+            int samples = Math.max(12, (int) (Math.PI * ring / (GameConfig.ENEMY_ESCAPE_SEARCH_STEP / 2)));
+            for (int i = 0; i < samples; i++) {
+                double angle = Math.PI * 2 * i / samples;
+                double x = enemy.getX() + Math.cos(angle) * ring;
+                double y = enemy.getY() + Math.sin(angle) * ring;
+                if (!navigation.canOccupy(x, y, radius, enemy.getWorld())) continue;
+                if (navigation.isPathClearTo(enemy.getX(), enemy.getY(), x, y, radius, enemy.getWorld())) {
+                    if (field.directionFrom(x, y) != null) return new double[]{x, y};
+                    if (reachable == null) reachable = new double[]{x, y};
+                } else if (popOut == null && ring <= popLimit) {
+                    popOut = new double[]{x, y};
+                }
+            }
+        }
+        return reachable != null ? reachable : popOut;
     }
 
     /**
@@ -163,12 +307,13 @@ public final class EnemySystem {
     }
 
     private void resolvePlayerHits(Player player, PlayerAttackSystem playerAttacks) {
+        // 伤害统一走 Enemy.takeHit：先扣防御，并保证每次至少造成 1 点。
         for (Projectile projectile : playerAttacks.getProjectiles()) {
             for (Enemy enemy : enemies) {
                 if (!enemy.isDead() && projectile.getWorld() == enemy.getWorld()
                         && CollisionUtil.circleIntersectsCircle(projectile.getX(), projectile.getY(), projectile.getRadius(),
                         enemy.getX(), enemy.getY(), enemyRadius(enemy))) {
-                    enemy.damage(player.getAttackDamage());
+                    enemy.takeHit(player.getAttackDamage());
                     projectile.expire();
                     break;
                 }
@@ -180,7 +325,7 @@ public final class EnemySystem {
                 if (enemy.getWorld() != WorldType.SHADOW || enemy.getLastMeleeHitId() == attackId) continue;
                 if (Math.hypot(enemy.getX() - player.getX(), enemy.getY() - player.getY())
                         <= GameConfig.SHADOW_MELEE_RANGE + enemyRadius(enemy)) {
-                    enemy.damage(player.getAttackDamage());
+                    enemy.takeHit(player.getAttackDamage());
                     enemy.setLastMeleeHitId(attackId);
                 }
             }
@@ -445,7 +590,7 @@ public final class EnemySystem {
     }
     private void summonWolves(Enemy enemy, Player player, RoomNavigationSystem navigation) {
         if (enemies.stream().filter(other -> other.getKind() == EnemyKind.WOLF && other.getWorld() == WorldType.SHADOW).count() >= 2) return;
-        Enemy wolf = new Enemy(EnemyKind.WOLF, WorldType.SHADOW, enemy.getX() + 90, enemy.getY());
+        Enemy wolf = new Enemy(EnemyKind.WOLF, WorldType.SHADOW, enemy.getX() + 90, enemy.getY(), floor);
         if (navigation.canOccupy(wolf.getX(), wolf.getY(), enemyRadius(wolf), WorldType.SHADOW)) enemies.add(wolf);
     }
 

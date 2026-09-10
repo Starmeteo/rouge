@@ -34,6 +34,22 @@ class PlayerAttackSystemTest {
     }
 
     @Test
+    void aFullChargeBarGivesAComfortableBurstOfShots() {
+        Player player = new Player(100.0, 100.0);
+        PlayerAttackSystem attacks = new PlayerAttackSystem();
+        int shots = 0;
+        // 只等冷却、不调用 player.updateAttackCharges：本测试只看蓝条本身能支撑多少发连射。
+        while (shots < 40) {
+            attacks.update(GameConfig.LIGHT_ATTACK_COOLDOWN + 0.01);
+            if (!attacks.tryAttack(player, 200.0, 100.0)) break;
+            shots++;
+        }
+
+        assertEquals(GameConfig.ATTACK_CHARGE_MAX, shots, "蓝条应当正好支撑满充能次数的连射");
+        assertTrue(shots >= 8, "满充能连射次数不能太少，实际 " + shots + " 发");
+    }
+
+    @Test
     void shadowAttackCreatesTemporaryMeleeArc() {
         Player player = new Player(100.0, 100.0);
         player.toggleWorld();

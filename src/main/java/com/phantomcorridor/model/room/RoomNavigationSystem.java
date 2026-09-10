@@ -91,16 +91,26 @@ public final class RoomNavigationSystem {
 
     /** 切界前寻找目标世界最近的合法落点；找不到时由调用方拒绝切换。 */
     public double[] findNearestSafePosition(double originX, double originY, WorldType targetWorld) {
-        if (canOccupy(originX, originY, GameConfig.PLAYER_RADIUS, targetWorld)) {
+        return findNearestSafePosition(originX, originY, targetWorld, GameConfig.PLAYER_RADIUS);
+    }
+
+    /**
+     * 指定身位的最近合法落点。
+     *
+     * <p>敌人脱困时按自身半径找一个站得下的位置；首领半径 46，比玩家大得多，
+     * 所以不能共用玩家半径的那套判定。
+     */
+    public double[] findNearestSafePosition(double originX, double originY, WorldType targetWorld, double radius) {
+        if (canOccupy(originX, originY, radius, targetWorld)) {
             return new double[]{originX, originY};
         }
-        for (double radius = 8; radius <= RoomConfig.SHIFT_ESCAPE_SEARCH_RADIUS; radius += 8) {
-            int samples = Math.max(12, (int) (Math.PI * radius / 8));
+        for (double ring = 8; ring <= RoomConfig.SHIFT_ESCAPE_SEARCH_RADIUS; ring += 8) {
+            int samples = Math.max(12, (int) (Math.PI * ring / 8));
             for (int i = 0; i < samples; i++) {
                 double angle = Math.PI * 2 * i / samples;
-                double x = originX + Math.cos(angle) * radius;
-                double y = originY + Math.sin(angle) * radius;
-                if (canOccupy(x, y, GameConfig.PLAYER_RADIUS, targetWorld)) return new double[]{x, y};
+                double x = originX + Math.cos(angle) * ring;
+                double y = originY + Math.sin(angle) * ring;
+                if (canOccupy(x, y, radius, targetWorld)) return new double[]{x, y};
             }
         }
         return null;

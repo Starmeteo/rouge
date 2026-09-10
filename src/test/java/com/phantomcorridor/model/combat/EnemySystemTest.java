@@ -11,6 +11,7 @@ import com.phantomcorridor.model.entity.EnemyKind;
 import com.phantomcorridor.model.entity.Player;
 import com.phantomcorridor.model.room.Room;
 import com.phantomcorridor.model.room.RoomArea;
+import com.phantomcorridor.model.room.RoomFlowField;
 import com.phantomcorridor.model.room.RoomNavigationSystem;
 import com.phantomcorridor.model.room.RoomShape;
 import com.phantomcorridor.model.room.Wall;
@@ -236,6 +237,115 @@ class EnemySystemTest {
 
     private static double distance(Player player, Enemy enemy) {
         return Math.hypot(enemy.getX() - player.getX(), enemy.getY() - player.getY());
+    }
+
+    @Test
+    void enemyWedgedInsideAWallIsFreedAndResumesTheChase() {
+        // 模拟“被顶进墙里”：身位和墙重叠，站不下也走不动，只有脱困兜底能救它。
+        Room room = new Room(3, RoomType.BATTLE, 0, 0, RoomShape.RECTANGLE,
+                List.of(new RoomArea(0, 0, AppConfig.VIEW_WIDTH, AppConfig.VIEW_HEIGHT)),
+                List.of(new Wall(600, 400, 200, 200, null)));
+        RoomNavigationSystem navigation = navigationFor(room);
+        Player player = new Player(150, 150);
+        EnemySystem system = new EnemySystem();
+        system.enterRoom(room, 42L, player, navigation);
+        Enemy enemy = soleEnemy(system, WorldType.LIGHT, player, navigation);
+        enemy.setPosition(610, 500);
+        assertFalse(navigation.canOccupy(610, 500, 27, WorldType.LIGHT), "测试前提：敌人和墙重叠");
+
+        runFor(system, player, navigation, GameConfig.ENEMY_STUCK_TIME + 2.0);
+
+        assertTrue(navigation.canOccupy(enemy.getX(), enemy.getY(), 27, WorldType.LIGHT),
+                "卡住的敌人必须被挪到站得下的位置，而不是一直贴在墙上");
+        double afterEscape = distance(player, enemy);
+        runFor(system, player, navigation, 2.0);
+        assertTrue(distance(player, enemy) < afterEscape, "脱困之后应当继续朝玩家推进");
+    }
+
+    @Test
+    void escapingEnemiesNeverTeleportThroughWalls() {
+        // 玩家被围在小屋里、首领在外面转圈：脱困兜底可以把它挪开，但不能隔墙跳进小屋。
+        Room room = sealedBoxRoom();
+        RoomNavigationSystem navigation = navigationFor(room);
+        Player player = new Player(400, 480);
+        EnemySystem system = new EnemySystem();
+        system.enterRoom(room, 3L, player, navigation);
+        Enemy watcher = system.getEnemies().getFirst();
+        watcher.setPosition(576, 300);
+        watcher.setBlinkCooldown(999.0);   // 关掉裂隙闪现，只看普通脱困
+
+        for (int frame = 0; frame < 12 * 60; frame++) {
+            system.update(DT, player, new PlayerAttackSystem(), navigation);
+            assertFalse(insideSealedBox(watcher.getX(), watcher.getY()),
+                    "脱困不能把敌人隔墙搬进小屋，实际位置 (" + watcher.getX() + "," + watcher.getY() + ")");
+        }
+    }
+
+    /** 小屋墙体围出来的内部区域（首领站得下但进不来）。 */
+    private static boolean insideSealedBox(double x, double y) {
+        return x > 346 && x < 454 && y > 456 && y < 504;
+    }
+
+    @Test
+    void watcherBlinkClosesAGapItCannotWalkThrough() {
+        // 玩家被围在一间只有玩家身位挤得进的小屋里：首领（直径 92）正常寻路永远到不了。
+        Room room = sealedBoxRoom();
+        RoomNavigationSystem navigation = navigationFor(room);
+        Player player = new Player(400, 480);
+        EnemySystem system = new EnemySystem();
+        system.enterRoom(room, 3L, player, navigation);
+        Enemy watcher = system.getEnemies().getFirst();
+        assertTrue(watcher.isBoss());
+        watcher.setPosition(980, 820);
+        assertTrue(navigation.canOccupy(980, 820, 46, WorldType.LIGHT), "测试前提：首领站在合法位置");
+        RoomFlowField bossField = new RoomFlowField(room);
+        bossField.rebuild(navigation, player.getX(), player.getY(), WorldType.LIGHT, 46);
+        assertFalse(bossField.isReachable(980, 820), "测试前提：首领与玩家之间没有可走的路");
+
+        boolean sawFlash = false;
+        PlayerAttackSystem playerAttacks = new PlayerAttackSystem();
+        for (int frame = 0; frame < 20 * 60; frame++) {
+            system.update(DT, player, playerAttacks, navigation);
+            sawFlash |= system.getBlinkFlash() != null;
+        }
+
+        assertTrue(sawFlash, "追不上时守望者应当撕开裂隙闪现");
+        assertTrue(navigation.canOccupy(watcher.getX(), watcher.getY(), 46, WorldType.LIGHT),
+                "闪现落点必须站得下");
+        assertTrue(distance(player, watcher) <= GameConfig.WATCHER_BLINK_SEARCH_RADIUS,
+                "闪现后应当出现在玩家附近，实际距离 " + distance(player, watcher));
+        assertTrue(distance(player, watcher) > 46 + GameConfig.PLAYER_RADIUS,
+                "落点不能直接压在玩家身上，实际距离 " + distance(player, watcher)
+                        + "，首领位于 (" + watcher.getX() + "," + watcher.getY() + ")");
+    }
+
+    @Test
+    void blinkCooldownBlocksASecondRiftJump() {
+        Room room = sealedBoxRoom();
+        RoomNavigationSystem navigation = navigationFor(room);
+        Player player = new Player(400, 480);
+        EnemySystem system = new EnemySystem();
+        system.enterRoom(room, 3L, player, navigation);
+        Enemy watcher = system.getEnemies().getFirst();
+        watcher.setPosition(980, 820);
+        watcher.setBlinkCooldown(999.0);
+
+        boolean sawFlash = false;
+        PlayerAttackSystem playerAttacks = new PlayerAttackSystem();
+        for (int frame = 0; frame < 6 * 60; frame++) {
+            system.update(DT, player, playerAttacks, navigation);
+            sawFlash |= system.getBlinkFlash() != null;
+        }
+
+        assertFalse(sawFlash, "冷却期间不能闪现");
+    }
+
+    /** 把玩家围在中间的小屋：内部放得下玩家，但首领从外面挤不进来。 */
+    private static Room sealedBoxRoom() {
+        return new Room(8, RoomType.BOSS, 0, 0, RoomShape.RECTANGLE,
+                List.of(new RoomArea(0, 0, AppConfig.VIEW_WIDTH, AppConfig.VIEW_HEIGHT)),
+                List.of(new Wall(300, 380, 200, 30, null), new Wall(300, 550, 200, 30, null),
+                        new Wall(270, 380, 30, 200, null), new Wall(500, 380, 30, 200, null)));
     }
 
     /** 保留房内唯一的指定世界敌人，其余全部清掉，让断言不受其他随机敌人干扰。 */

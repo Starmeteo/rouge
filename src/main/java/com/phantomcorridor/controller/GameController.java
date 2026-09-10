@@ -82,6 +82,13 @@ public final class GameController {
 
     private void keyPressed(KeyCode key) {
         if (session.getPlayer().getHp() <= 0) {
+            // 死亡结算保持“只能点击按钮”的交互约定。
+            return;
+        }
+        // 通关结算沿用上游的快捷重开/返回主菜单。
+        if (session.isRunCleared()) {
+            if (key == KeyCode.R) newRun();
+            else if (key == KeyCode.M) onMainMenu.run();
             return;
         }
         switch (key) {

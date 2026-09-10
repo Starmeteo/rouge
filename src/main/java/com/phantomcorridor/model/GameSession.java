@@ -23,7 +23,10 @@ public final class GameSession {
     private final EnemySystem enemies = new EnemySystem();
     private final RoomNavigationSystem navigation = new RoomNavigationSystem();
     private final RoomContentSystem roomContent = new RoomContentSystem();
+    private long runSeed;
     private long dungeonSeed;
+    private int floor = 1;
+    private boolean runCleared;
     private double phasePulseVisibleRemaining;
     private double aimX;
     private double aimY;
@@ -37,21 +40,47 @@ public final class GameSession {
     public void newRun(String configuredSeed) {
         player.reset(AppConfig.VIEW_WIDTH / 2.0, AppConfig.VIEW_HEIGHT / 2.0);
         worldShift.reset();
+        runSeed = MapGenerator.parseSeed(configuredSeed);
+        floor = 1;
+        runCleared = false;
+        aimX = player.getX() + 1.0;
+        aimY = player.getY();
+        startFloor();
+    }
+
+    /**
+     * 生成当前层的地图并把玩家放到入口。
+     *
+     * <p>玩家自身的状态（生命、金币、装备、道具）跨层保留，只有地图、敌人与房间内容重新生成；
+     * 每层地图种子由本局种子加层数偏移得到，所以同一种子下每层都不同但可复现。
+     */
+    private void startFloor() {
+        dungeonSeed = runSeed + (floor - 1) * GameConfig.FLOOR_SEED_STEP;
         attackSystem.reset();
         enemyProjectiles.reset();
         enemies.reset();
-        phasePulseVisibleRemaining = 0.0;
-        roomAnnouncement = "入口房";
-        roomAnnouncementRemaining = 2.2;
-        aimX = player.getX() + 1.0;
-        aimY = player.getY();
-        combatActive = false;
-        dungeonSeed = MapGenerator.parseSeed(configuredSeed);
-        roomContent.reset(dungeonSeed);
+        enemies.setFloor(floor);
+        roomContent.reset(dungeonSeed, floor);
         navigation.reset(new MapGenerator().generate(dungeonSeed));
         navigation.placeAtEntrance(player);
         roomContent.enterRoom(navigation.getCurrentRoom(), player);
         enemies.enterRoom(navigation.getCurrentRoom(), dungeonSeed, player, navigation);
+        phasePulseVisibleRemaining = 0.0;
+        combatActive = false;
+        roomAnnouncement = floorAnnouncement();
+        roomAnnouncementRemaining = 2.6;
+    }
+
+    /** 使用首领房里的传送门：进入下一层；已经是最后一层则通关。 */
+    private void usePortal() {
+        if (floor >= GameConfig.TOTAL_FLOORS) {
+            runCleared = true;
+            roomAnnouncement = "穿越裂隙 · 五层走尽";
+            roomAnnouncementRemaining = 3.0;
+            return;
+        }
+        floor++;
+        startFloor();
     }
 
     public void update(double dt, double movementX, double movementY,
@@ -59,7 +88,7 @@ public final class GameSession {
         worldShift.update(dt);
         phasePulseVisibleRemaining = Math.max(0.0, phasePulseVisibleRemaining - dt);
         roomAnnouncementRemaining = Math.max(0.0, roomAnnouncementRemaining - Math.max(0.0, dt));
-        if (player.getHp() <= 0) {
+        if (player.getHp() <= 0 || runCleared) {
             player.updateAnimation(dt, 0.0, 0.0, false, false);
             return;
         }
@@ -71,7 +100,7 @@ public final class GameSession {
             Room entered = navigation.getCurrentRoom();
             roomContent.enterRoom(entered, player);
             enemies.enterRoom(entered, dungeonSeed, player, navigation);
-            roomAnnouncement = roomTypeLabel(entered.type());
+            roomAnnouncement = roomAnnouncement(entered);
             roomAnnouncementRemaining = 2.2;
         }
         // 房间内容只在第一次进入时生成，进出不会重刷；这里只维护“待确认商品”的有效性。
@@ -134,6 +163,21 @@ public final class GameSession {
     public double getRoomAnnouncementRemaining() { return roomAnnouncementRemaining; }
     public void requestInteract() { interactRequested = true; }
 
+    /** 当前层数（从 1 开始）。 */
+    public int getFloor() { return floor; }
+
+    /** 一局总共多少层。 */
+    public int getTotalFloors() { return GameConfig.TOTAL_FLOORS; }
+
+    /** 是否已经打通最后一层：渲染层据此显示通关界面。 */
+    public boolean isRunCleared() { return runCleared; }
+
+    /** 当前房间是否站着通往下一层的传送门。 */
+    public boolean isPortalVisible() { return navigation.getCurrentRoom().hasPortal(); }
+
+    /** 守望者裂隙闪现的视觉残留；没有时返回 null。 */
+    public EnemySystem.BlinkFlash getBlinkFlash() { return enemies.getBlinkFlash(); }
+
     /** 当前房间地面上的拾取物：挂在房间上，所以离开再回来东西还在。 */
     public List<Pickup> getPickups() { return navigation.getCurrentRoom().loot().pickupsView(); }
 
@@ -142,6 +186,11 @@ public final class GameSession {
 
     public String getInteractionPrompt() {
         return roomContent.prompt(navigation.getCurrentRoom(), player);
+    }
+
+    /** 当前交互目标（地面拾取物）；渲染层用它给最近的那件物品画名称标签。 */
+    public Pickup getInteractionTarget() {
+        return roomContent.currentTarget(navigation.getCurrentRoom(), player);
     }
 
     /** 商店商品的售价（金币）；当前房间不是商店或物品不可售时返回 -1。 */
@@ -162,8 +211,17 @@ public final class GameSession {
             // 事件房抽到伏击：房间里重新刷怪并重新关门，清空后宝箱照常出现。
             current.setCleared(false);
             enemies.spawnEventEnemies(current, dungeonSeed, player, navigation);
+        } else if (outcome == RoomContentSystem.Outcome.PORTAL) {
+            usePortal();
         }
     }
+
+    /** 进入初始房间时提示层数，其余房间只报类型。 */
+    private String roomAnnouncement(Room room) {
+        return room.type() == RoomType.ENTRANCE ? floorAnnouncement() : roomTypeLabel(room.type());
+    }
+
+    private String floorAnnouncement() { return "第 " + floor + " 层 · 入口房"; }
 
     private static String roomTypeLabel(RoomType type) {
         return switch (type) {

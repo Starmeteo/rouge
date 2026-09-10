@@ -30,14 +30,18 @@ public final class RoomContentSystem {
         /** 已在本系统内处理完（拾取、装备、选中商品、完成购买、开箱、事件结算）。 */
         HANDLED,
         /** 事件房抽到伏击：需要会话层在当前房间刷出敌人。 */
-        EVENT_AMBUSH
+        EVENT_AMBUSH,
+        /** 走进首领房清空后出现的传送门：需要会话层推进层数或结算通关。 */
+        PORTAL
     }
 
     private long dungeonSeed;
+    private int floor = 1;
     private Pickup selectedOffer;
 
-    public void reset(long dungeonSeed) {
+    public void reset(long dungeonSeed, int floor) {
         this.dungeonSeed = dungeonSeed;
+        this.floor = Math.max(1, floor);
         this.selectedOffer = null;
     }
 
@@ -82,6 +86,7 @@ public final class RoomContentSystem {
     public Outcome interact(Room room, Player player) {
         RoomLoot loot = room.loot();
         if (room.type() == RoomType.EVENT && loot.isEventPending()) return resolveEvent(room);
+        if (isPortalTarget(room, player)) return Outcome.PORTAL;
         if (room.hasUnopenedChest() && nearChest(room, player)) return openChest(room);
         Pickup target = nearestPickup(room, player);
         if (target == null) return Outcome.NONE;
@@ -95,17 +100,46 @@ public final class RoomContentSystem {
     public String prompt(Room room, Player player) {
         RoomLoot loot = room.loot();
         if (room.type() == RoomType.EVENT && loot.isEventPending()) return "E  触发事件";
+        if (isPortalTarget(room, player)) {
+            return floor >= GameConfig.TOTAL_FLOORS
+                    ? "E  穿过裂隙（通关）"
+                    : "E  进入传送门（第 " + (floor + 1) + " 层）";
+        }
         if (room.hasUnopenedChest() && nearChest(room, player)) return "E  打开宝箱";
         Pickup target = nearestPickup(room, player);
         if (target == null) return "";
         int price = room.type() == RoomType.SHOP ? priceOf(target) : -1;
         if (price >= 0) {
-            if (target != selectedOffer) return "E  购买 " + price + " 金币";
+            if (target != selectedOffer) return "E  购买 " + target.displayName() + " " + price + " 金币";
             return player.getCoins() >= price
                     ? "E  确认购买 " + price + " 金币（走开取消）"
                     : "金币不足：需 " + price + "，当前 " + player.getCoins();
         }
-        return target.type() == Pickup.Type.EQUIPMENT ? "E  装备" : "E  拾取";
+        return target.type() == Pickup.Type.EQUIPMENT
+                ? "E  装备 " + target.displayName()
+                : "E  拾取 " + target.displayName();
+    }
+
+    /**
+     * 当前交互目标（地面上离玩家最近、且在交互范围内的拾取物）；宝箱、事件或传送门是目标时返回 null。
+     *
+     * <p>提示文本与地面名称标签都取自这里，保证两处判断永远一致。
+     */
+    public Pickup currentTarget(Room room, Player player) {
+        if (room.type() == RoomType.EVENT && room.loot().isEventPending()) return null;
+        if (isPortalTarget(room, player)) return null;
+        if (room.hasUnopenedChest() && nearChest(room, player)) return null;
+        return nearestPickup(room, player);
+    }
+
+    /** 传送门是否就是当前该交互的目标：和宝箱同时在房间里时按距离决出。 */
+    private static boolean isPortalTarget(Room room, Player player) {
+        if (!room.hasPortal()) return false;
+        double toPortal = Math.hypot(player.getX() - centerX(room), player.getY() - centerY(room));
+        if (toPortal > GameConfig.INTERACT_RADIUS) return false;
+        if (!room.hasUnopenedChest()) return true;
+        return toPortal < Math.hypot(player.getX() - room.doorCenter(Direction.NORTH),
+                player.getY() - (room.minY() + RoomConfig.CHEST_OFFSET_Y));
     }
 
     /** 商品售价（金币）；不是可售装备时返回 -1。 */

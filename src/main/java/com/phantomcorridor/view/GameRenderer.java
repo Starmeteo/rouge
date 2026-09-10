@@ -5,6 +5,7 @@ import com.phantomcorridor.config.GameConfig;
 import com.phantomcorridor.config.RoomConfig;
 import com.phantomcorridor.model.GameSession;
 import com.phantomcorridor.model.Pickup;
+import com.phantomcorridor.model.RoomType;
 import com.phantomcorridor.model.WorldType;
 import com.phantomcorridor.model.entity.Player;
 import com.phantomcorridor.model.entity.PlayerAnimationState;
@@ -31,12 +32,17 @@ import javafx.scene.paint.CycleMethod;
 import javafx.scene.paint.LinearGradient;
 import javafx.scene.paint.RadialGradient;
 import javafx.scene.paint.Stop;
+import javafx.scene.shape.ArcType;
 import javafx.scene.text.Font;
 import javafx.scene.text.FontWeight;
 import javafx.scene.text.TextAlignment;
 
 /** Canvas 游戏画面渲染器。只读取模型，不修改游戏状态。 */
 public final class GameRenderer {
+
+    /** 小地图：面板边长与每格房间的像素间距（间距要够大，房间之间才看得出连接关系）。 */
+    private static final double MINI_MAP_PANEL_SIZE = 280.0;
+    private static final double MINI_MAP_SCALE = 27.0;
 
     private static final Color LIGHT_GOLD = Color.web("#e8bd68");
     private static final Color SHADOW_VIOLET = Color.web("#9b65dc");
@@ -64,8 +70,10 @@ public final class GameRenderer {
         drawFloor(g, light);
         drawRoom(g, session, light);
         drawPhaseWalls(g, session, light);
+        drawBlinkFlash(g, session);
         drawEnemies(g, session, player.getCurrentWorld());
         drawEnemyAttacks(g, session, player.getCurrentWorld());
+        drawPortal(g, session);
         drawPickups(g, session);
         drawInteractionPrompt(g, session);
         drawPlayer(g, player, light);
@@ -78,6 +86,51 @@ public final class GameRenderer {
         drawRoomAnnouncement(g, session);
         drawControls(g, light);
         if (player.getHp() <= 0) drawDeathOverlay(g, session);
+        else if (session.isRunCleared()) drawVictoryOverlay(g, session);
+    }
+
+    /**
+     * 首领房清空后出现的层间传送门：一圈旋转的裂隙 + 目标层数。
+     *
+     * <p>用玩家的动画计时做旋转，不额外引入渲染状态。
+     */
+    private void drawPortal(GraphicsContext g, GameSession session) {
+        if (!session.isPortalVisible()) return;
+        Room room = session.getNavigation().getCurrentRoom();
+        double x = (room.minX() + room.maxX()) / 2.0;
+        double y = (room.minY() + room.maxY()) / 2.0;
+        double time = session.getPlayer().getAnimationTime();
+        double pulse = 1.0 + Math.sin(time * 2.6) * 0.06;
+        double outer = 86.0 * pulse;
+        double inner = 54.0 * pulse;
+        g.setFill(Color.rgb(6, 4, 12, 0.9));
+        g.fillOval(x - outer, y - outer, outer * 2, outer * 2);
+        for (int i = 0; i < 3; i++) {
+            double start = Math.toDegrees(time * (2.2 + i * 0.7) + i * 120.0);
+            g.setStroke(Color.color(0.72, 0.42, 1.0, 0.9 - i * 0.18));
+            g.setLineWidth(7.0 - i * 1.6);
+            g.strokeArc(x - outer, y - outer, outer * 2, outer * 2, start, 108, ArcType.OPEN);
+        }
+        g.setFill(new RadialGradient(0, 0, 0.5, 0.5, 0.5, true, CycleMethod.NO_CYCLE,
+                new Stop(0.0, Color.web("#fff3c4")), new Stop(0.55, Color.web("#a86bff")),
+                new Stop(1.0, Color.color(0.25, 0.10, 0.4, 0.15))));
+        g.fillOval(x - inner, y - inner, inner * 2, inner * 2);
+        g.setStroke(Color.web("#ffe9a8"));
+        g.setLineWidth(3.0);
+        g.strokeOval(x - inner, y - inner, inner * 2, inner * 2);
+        boolean lastFloor = session.getFloor() >= session.getTotalFloors();
+        g.setTextAlign(TextAlignment.CENTER);
+        g.setFill(Color.web("#241033"));
+        g.setFont(Font.font("Microsoft YaHei UI", FontWeight.BOLD, 22));
+        g.fillText(lastFloor ? "通关" : "第 " + (session.getFloor() + 1) + " 层",
+                x, y + 8);
+        g.setTextAlign(TextAlignment.LEFT);
+        g.setFill(Color.rgb(255, 240, 200, 0.9));
+        g.setFont(Font.font("Microsoft YaHei UI", FontWeight.BOLD, 14));
+        g.setTextAlign(TextAlignment.CENTER);
+        g.fillText(session.getFloor() + " / " + session.getTotalFloors() + " 层已通", x, y + outer + 26);
+        g.fillText("走近按 E 传送", x, y + outer + 46);
+        g.setTextAlign(TextAlignment.LEFT);
     }
 
     private void drawPhasePulse(GraphicsContext g, GameSession session, boolean light) {
@@ -88,6 +141,37 @@ public final class GameRenderer {
         g.setStroke(Color.color(color.getRed(), color.getGreen(), color.getBlue(), 0.74));
         g.setLineWidth(4.0);
         g.strokeRect(player.getX() - radius, player.getY() - radius, radius * 2.0, radius * 2.0);
+    }
+
+    /**
+     * 守望者裂隙闪现的视觉：起点与终点各一道扩散的裂隙，中间连一道残影。
+     *
+     * <p>传送必须看得见——否则玩家只会觉得首领“瞬移卡了”。
+     */
+    private void drawBlinkFlash(GraphicsContext g, GameSession session) {
+        var flash = session.getBlinkFlash();
+        if (flash == null) return;
+        double life = Math.max(0.001, GameConfig.WATCHER_BLINK_FLASH_TIME);
+        double progress = Math.min(1.0, Math.max(0.0, 1.0 - flash.remaining() / life));
+        double alpha = Math.max(0.0, 1.0 - progress);
+        g.setGlobalBlendMode(BlendMode.ADD);
+        g.setStroke(Color.color(0.78, 0.48, 1.0, alpha * 0.9));
+        g.setLineWidth(6.0 * (1.0 - progress * 0.5));
+        g.strokeLine(flash.fromX(), flash.fromY(), flash.toX(), flash.toY());
+        g.setGlobalBlendMode(BlendMode.SRC_OVER);
+        drawRiftBurst(g, flash.fromX(), flash.fromY(), 40.0 + progress * 70.0, alpha * 0.9);
+        drawRiftBurst(g, flash.toX(), flash.toY(), 26.0 + progress * 110.0, alpha);
+    }
+
+    private void drawRiftBurst(GraphicsContext g, double x, double y, double radius, double alpha) {
+        g.setFill(Color.color(0.42, 0.16, 0.62, alpha * 0.5));
+        g.fillOval(x - radius * 0.55, y - radius * 0.55, radius * 1.1, radius * 1.1);
+        g.setStroke(Color.color(0.88, 0.7, 1.0, alpha));
+        g.setLineWidth(3.0);
+        g.strokeOval(x - radius, y - radius * 0.72, radius * 2, radius * 1.44);
+        g.setStroke(Color.color(1.0, 0.95, 0.75, alpha * 0.9));
+        g.setLineWidth(1.6);
+        g.strokeOval(x - radius * 0.62, y - radius * 0.42, radius * 1.24, radius * 0.84);
     }
 
     /** 非当前世界的敌人及攻击完全不绘制，与模型的同界碰撞规则保持一致。 */
@@ -279,18 +363,20 @@ public final class GameRenderer {
                 case ITEM -> Color.web("#70d8ff");
                 case EQUIPMENT -> Color.web("#f0c86e");
             };
-            // 商店商品额外画出价格，并标出“已选中、等待确认”的那一件。
+            // 商店商品额外画出“名称 + 价格”，并标出“已选中、等待确认”的那一件。
             int price = session.getShopPrice(pickup);
             if (price >= 0) drawPriceTag(g, session, pickup, price);
 
-            int icon = pickup.type() == com.phantomcorridor.model.Pickup.Type.COIN ? 1
-                    : pickup.type() == com.phantomcorridor.model.Pickup.Type.ITEM ? 2 + Math.floorMod(pickup.amount(), 6) : -1;
-            if (pickup.type() == com.phantomcorridor.model.Pickup.Type.EQUIPMENT) {
+            int icon = pickup.type() == Pickup.Type.COIN ? 1
+                    : pickup.type() == Pickup.Type.ITEM ? 2 + Math.floorMod(pickup.amount(), 6) : -1;
+            if (pickup.type() == Pickup.Type.EQUIPMENT) {
                 Image source = pickup.amount() < 3 ? WEAPON_ICONS : EQUIPMENT_ICONS;
                 int local = pickup.amount() % 3;
                 if (source != null) g.drawImage(source, local * source.getWidth() / 3.0, 0,
                         source.getWidth() / 3.0, source.getHeight(), pickup.x() - 24, pickup.y() - 24, 48, 48);
                 else { g.setFill(color); g.fillRect(pickup.x() - 8, pickup.y() - 8, 16, 16); }
+            } else if (pickup.type() == Pickup.Type.HEALTH) {
+                drawHealthPack(g, pickup.x(), pickup.y());
             } else if (icon >= 0 && REWARD_ICONS != null) {
                 double cellW = REWARD_ICONS.getWidth() / 4.0, cellH = REWARD_ICONS.getHeight() / 2.0;
                 double sx = (icon % 4) * cellW, sy = (icon / 4) * cellH;
@@ -306,6 +392,10 @@ public final class GameRenderer {
             }
             g.setStroke(Color.color(color.getRed(), color.getGreen(), color.getBlue(), .45));
             g.strokeRect(pickup.x() - 11, pickup.y() - 11, 22, 22);
+            // 走到物品旁边时写出名称，避免“地上一个红包不知道是什么”。
+            if (price < 0 && pickup == session.getInteractionTarget()) {
+                drawPickupLabel(g, pickup.displayName(), pickup.x(), pickup.y() + 30);
+            }
         }
         if (session.isChestVisible()) {
             Room room = session.getNavigation().getCurrentRoom();
@@ -336,7 +426,8 @@ public final class GameRenderer {
         g.fillText("倒下了", AppConfig.VIEW_WIDTH / 2.0, AppConfig.VIEW_HEIGHT / 2.0 - 24);
         g.setFont(Font.font("Microsoft YaHei UI", 18));
         g.setFill(Color.web("#c9b4ca"));
-        g.fillText("本次探索结束 · 金币 " + session.getCoins(), AppConfig.VIEW_WIDTH / 2.0, AppConfig.VIEW_HEIGHT / 2.0 + 18);
+        g.fillText("第 " + session.getFloor() + " 层探索结束 · 金币 " + session.getCoins(),
+                AppConfig.VIEW_WIDTH / 2.0, AppConfig.VIEW_HEIGHT / 2.0 + 18);
         drawDeathButton(g, session, centerX - 170, centerY + 44, 140, 50, "重新开始", false);
         drawDeathButton(g, session, centerX + 30, centerY + 44, 140, 50, "返回主菜单", true);
         g.setTextAlign(TextAlignment.LEFT);
@@ -418,12 +509,59 @@ public final class GameRenderer {
         g.fillText(label, x + width / 2.0, y + 31 - (hover ? 2 : 0));
     }
 
+    /** 打通第五层、穿过最后一道裂隙后的通关界面。 */
+    private void drawVictoryOverlay(GraphicsContext g, GameSession session) {
+        g.setFill(Color.rgb(10, 6, 18, 0.82));
+        g.fillRect(0, 0, AppConfig.VIEW_WIDTH, AppConfig.VIEW_HEIGHT);
+        g.setTextAlign(TextAlignment.CENTER);
+        g.setFill(Color.web("#ffeaa7"));
+        g.setFont(Font.font("Microsoft YaHei UI", FontWeight.BOLD, 44));
+        g.fillText("穿 越 完 成", AppConfig.VIEW_WIDTH / 2.0, AppConfig.VIEW_HEIGHT / 2.0 - 34);
+        g.setFont(Font.font("Microsoft YaHei UI", 19));
+        g.setFill(Color.web("#e5d3f5"));
+        g.fillText(session.getTotalFloors() + " 层裂隙全部走尽 · 金币 " + session.getCoins(),
+                AppConfig.VIEW_WIDTH / 2.0, AppConfig.VIEW_HEIGHT / 2.0 + 12);
+        g.setFont(Font.font("Microsoft YaHei UI", 16));
+        g.setFill(Color.web("#c9b4ca"));
+        g.fillText("[R] 再来一局        [M] 返回主菜单",
+                AppConfig.VIEW_WIDTH / 2.0, AppConfig.VIEW_HEIGHT / 2.0 + 58);
+        g.setTextAlign(TextAlignment.LEFT);
+    }
+
+    /** 生命恢复药剂：红包 + 白十字，比一个纯色小方块更容易认。 */
+    private void drawHealthPack(GraphicsContext g, double x, double y) {
+        g.setFill(Color.web("#c8454c"));
+        g.fillRoundRect(x - 15, y - 12, 30, 24, 6, 6);
+        g.setStroke(Color.web("#f2909a"));
+        g.setLineWidth(1.5);
+        g.strokeRoundRect(x - 15, y - 12, 30, 24, 6, 6);
+        g.setFill(Color.web("#ffe9ec"));
+        g.fillRect(x - 2.5, y - 8, 5, 16);
+        g.fillRect(x - 8, y - 2.5, 16, 5);
+        g.setFill(Color.web("#7d2b31"));
+        g.fillRect(x - 6, y - 17, 12, 5);
+    }
+
+    /** 名称标签：与提示框同色系的小牌子，画在物品下方。 */
+    private void drawPickupLabel(GraphicsContext g, String text, double centerX, double topY) {
+        double width = 18 + text.length() * 13.0;
+        double x = Math.max(8, Math.min(centerX - width / 2.0, AppConfig.VIEW_WIDTH - width - 8));
+        g.setFill(Color.rgb(8, 6, 12, .86));
+        g.fillRoundRect(x, topY, width, 22, 7, 7);
+        g.setStroke(Color.rgb(242, 210, 122, .8));
+        g.setLineWidth(1.2);
+        g.strokeRoundRect(x, topY, width, 22, 7, 7);
+        g.setFill(Color.web("#ffeec2"));
+        g.setFont(Font.font("Microsoft YaHei UI", FontWeight.BOLD, 13));
+        g.fillText(text, x + 9, topY + 16);
+    }
+
     /** 商店商品的价格牌：买得起显示金色，买不起显示灰红色并写明状态。 */
     private void drawPriceTag(GraphicsContext g, GameSession session, Pickup pickup, int price) {
         boolean affordable = session.canAfford(pickup);
         boolean selected = session.isShopOfferSelected(pickup);
-        String text = price + " 金币";
-        double width = 26 + text.length() * 8.0;
+        String text = pickup.displayName() + "  " + price + " 金币";
+        double width = 26 + text.length() * 13.0;
         double x = pickup.x() - width / 2.0;
         double y = pickup.y() + 30;
         g.setFill(Color.rgb(8, 6, 12, selected ? 0.95 : 0.82));
@@ -570,77 +708,155 @@ public final class GameRenderer {
     private void drawMiniMap(GraphicsContext g, GameSession session, boolean light) {
         if (session.getLightEnemyCount() + session.getShadowEnemyCount() > 0) return;
         Room current = session.getNavigation().getCurrentRoom();
-        double panelX = AppConfig.VIEW_WIDTH - 226.0;
+        double panelSize = MINI_MAP_PANEL_SIZE;
+        double panelX = AppConfig.VIEW_WIDTH - panelSize - 48.0;
         double panelY = 188.0;
-        double panelSize = 178.0;
         double originX = panelX + panelSize / 2.0;
         double originY = panelY + panelSize / 2.0;
-        double scale = 19.0;
+        double scale = MINI_MAP_SCALE;
         g.save();
         g.beginPath(); g.rect(panelX, panelY, panelSize, panelSize); g.closePath(); g.clip();
         g.setFill(Color.rgb(3, 3, 7, 0.88));
         g.fillRect(panelX, panelY, panelSize, panelSize);
         g.setStroke(light ? Color.web("#76572d") : Color.web("#533478"));
         g.setLineWidth(3); g.strokeRect(panelX, panelY, panelSize, panelSize);
-        g.setStroke(Color.rgb(220, 210, 225, 0.28));
-        g.setLineWidth(2.0);
+
+        // 连通性：细线把相邻的已发现房间连起来；当前房间朝向的、已经打开的门用亮线标出。
+        Color openLink = light ? Color.web("#e8bd68") : Color.web("#b98cff");
         for (Room room : session.getNavigation().getMap().rooms()) {
             if (!room.isDiscovered()) continue;
             for (var edge : room.neighbors().entrySet()) {
                 Room neighbor = session.getNavigation().getMap().room(edge.getValue());
                 if (!neighbor.isDiscovered() || room.id() > neighbor.id()) continue;
+                boolean usable = (room == current && room.isDoorOpen(edge.getKey()))
+                        || (neighbor == current && neighbor.isDoorOpen(edge.getKey().opposite()));
+                g.setStroke(usable ? openLink : Color.rgb(212, 202, 224, 0.40));
+                g.setLineWidth(usable ? 2.4 : 1.2);
                 g.strokeLine(originX + (room.mapX() - current.mapX()) * scale,
                         originY + (room.mapY() - current.mapY()) * scale,
                         originX + (neighbor.mapX() - current.mapX()) * scale,
                         originY + (neighbor.mapY() - current.mapY()) * scale);
             }
         }
+
         for (Room room : session.getNavigation().getMap().rooms()) {
             if (!room.isDiscovered()) continue;
             double x = originX + (room.mapX() - current.mapX()) * scale;
             double y = originY + (room.mapY() - current.mapY()) * scale;
             if (room == current) {
-                g.setFill(light ? Color.web("#fff0a8") : Color.web("#d5a0ff"));
-                g.fillRect(x - 7, y - 7, 14, 14);
-                g.setFill(Color.web("#ffffff"));
-                g.fillRect(x - 2, y - 2, 4, 4);
+                // 当前房间用深底 + 亮描边，中间留给类型图标（没有图标时留一个白点）。
+                g.setFill(Color.rgb(16, 12, 22, 0.96));
+                g.fillRect(x - 9, y - 9, 18, 18);
+                g.setStroke(light ? Color.web("#fff0a8") : Color.web("#d5a0ff"));
+                g.setLineWidth(3.0);
+                g.strokeRect(x - 9, y - 9, 18, 18);
+                if (!drawRoomGlyph(g, room, x, y, 15.0)) {
+                    g.setFill(Color.web("#ffffff"));
+                    g.fillRect(x - 2.5, y - 2.5, 5, 5);
+                }
             } else if (room.isVisited()) {
-                g.setFill(room.type() == com.phantomcorridor.model.RoomType.BOSS
-                        ? Color.web("#c54e58") : Color.web("#8e8995"));
-                g.fillRect(x - 5, y - 5, 10, 10);
+                g.setFill(room.type() == RoomType.BOSS ? Color.web("#c54e58") : Color.web("#8e8995"));
+                g.fillRect(x - 7, y - 7, 14, 14);
+                drawRoomGlyph(g, room, x, y, 13.0);
             } else {
-                g.setStroke(room.type() == com.phantomcorridor.model.RoomType.BOSS
-                        ? Color.web("#d94b5b") : Color.web("#77717f"));
+                g.setStroke(room.type() == RoomType.BOSS ? Color.web("#d94b5b") : Color.web("#77717f"));
                 g.setLineWidth(2);
-                g.strokeRect(x - 5, y - 5, 10, 10);
+                g.strokeRect(x - 6, y - 6, 12, 12);
             }
             // 状态提示：已清空的怪物房套一圈绿框（不用再回去），还有东西可拿的房间点一颗金点。
             if (room.isDefeatedBattleRoom()) {
                 g.setStroke(CLEARED_GREEN);
                 g.setLineWidth(2.0);
-                g.strokeRect(x - 8.5, y - 8.5, 17, 17);
+                g.strokeRect(x - 11, y - 11, 22, 22);
             }
             if (room.hasRemainingLoot()) {
                 g.setFill(LOOT_GOLD);
-                g.fillOval(x + 2.5, y - 9.5, 7, 7);
+                g.fillOval(x + 5, y - 13, 8, 8);
                 g.setStroke(Color.rgb(30, 20, 8, 0.85));
                 g.setLineWidth(1.0);
-                g.strokeOval(x + 2.5, y - 9.5, 7, 7);
+                g.strokeOval(x + 5, y - 13, 8, 8);
             }
         }
         g.restore();
-        g.setFill(Color.rgb(235, 226, 242, 0.76));
+        drawMiniMapLegend(g, panelX, panelY + panelSize);
+    }
+
+    /**
+     * 房间图标：商店「￥」、事件「?」、有未开宝箱的房间画宝箱、已清空的首领房画传送门环。
+     *
+     * @param glyphSize 文字图标字号：当前房间的格子更大，字号也跟着大一点
+     * @return 是否画出了图标（没有图标时由调用方画“当前房间”标记）
+     */
+    private boolean drawRoomGlyph(GraphicsContext g, Room room, double x, double y, double glyphSize) {
+        if (room.hasPortal()) {
+            // 传送门：紫色圆环 + 中心亮点，比宝箱更该被看见。
+            g.setStroke(Color.web("#b98cff"));
+            g.setLineWidth(2.0);
+            g.strokeOval(x - 7, y - 7, 14, 14);
+            g.setFill(Color.web("#fff3c4"));
+            g.fillOval(x - 2.5, y - 2.5, 5, 5);
+            return true;
+        }
+        if (room.hasUnopenedChest()) {
+            g.setFill(Color.web("#f0b858"));
+            g.fillRect(x - 6, y - 4, 12, 9);
+            g.setStroke(Color.rgb(38, 22, 6, 0.92));
+            g.setLineWidth(1.0);
+            g.strokeRect(x - 6, y - 4, 12, 9);
+            g.strokeLine(x - 6, y - 1, x + 6, y - 1);
+            g.setFill(Color.rgb(56, 28, 8, 0.95));
+            g.fillRect(x - 1.5, y - 1, 3, 4);
+            return true;
+        }
+        String glyph = switch (room.type()) {
+            case SHOP -> "￥";
+            case EVENT -> "?";
+            default -> null;
+        };
+        if (glyph == null) return false;
+        g.setTextAlign(TextAlignment.CENTER);
+        g.setFont(Font.font("Microsoft YaHei UI", FontWeight.BOLD, glyphSize));
+        g.setFill(room.type() == RoomType.SHOP ? Color.web("#ffe08a") : Color.web("#d9bcff"));
+        g.fillText(glyph, x, y + glyphSize * 0.36);
+        g.setTextAlign(TextAlignment.LEFT);
+        return true;
+    }
+
+    private void drawMiniMapLegend(GraphicsContext g, double panelX, double legendY) {
+        Color text = Color.rgb(235, 226, 242, 0.66);
+        g.setFill(Color.rgb(235, 226, 242, 0.78));
         g.setFont(Font.font("Consolas", FontWeight.BOLD, 12));
-        g.fillText("探索地图", panelX + 12, panelY + panelSize + 18);
-        g.setFill(LOOT_GOLD);
-        g.fillOval(panelX + 12, panelY + panelSize + 25, 7, 7);
-        g.setFill(Color.rgb(235, 226, 242, 0.62));
-        g.fillText("有未拿取", panelX + 24, panelY + panelSize + 32);
+        g.fillText("探索地图", panelX + 12, legendY + 18);
+
+        g.setFont(Font.font("Microsoft YaHei UI", FontWeight.BOLD, 13));
+        g.setFill(Color.web("#ffe08a"));
+        g.fillText("￥", panelX + 12, legendY + 40);
+        g.setFill(text);
+        g.setFont(Font.font("Microsoft YaHei UI", 12));
+        g.fillText("商店", panelX + 27, legendY + 40);
+        g.setFill(Color.web("#d9bcff"));
+        g.setFont(Font.font("Microsoft YaHei UI", FontWeight.BOLD, 13));
+        g.fillText("?", panelX + 74, legendY + 40);
+        g.setFill(text);
+        g.setFont(Font.font("Microsoft YaHei UI", 12));
+        g.fillText("事件", panelX + 87, legendY + 40);
+        g.setFill(Color.web("#f0b858"));
+        g.fillRect(panelX + 134, legendY + 31, 12, 9);
+        g.setStroke(Color.rgb(38, 22, 6, 0.92));
+        g.setLineWidth(1.0);
+        g.strokeRect(panelX + 134, legendY + 31, 12, 9);
+        g.setFill(text);
+        g.fillText("宝箱", panelX + 152, legendY + 40);
+
         g.setStroke(CLEARED_GREEN);
         g.setLineWidth(2.0);
-        g.strokeRect(panelX + 96, panelY + panelSize + 23, 11, 11);
-        g.setFill(Color.rgb(235, 226, 242, 0.62));
-        g.fillText("已清空", panelX + 113, panelY + panelSize + 32);
+        g.strokeRect(panelX + 12, legendY + 49, 12, 12);
+        g.setFill(text);
+        g.fillText("已清空", panelX + 30, legendY + 60);
+        g.setFill(LOOT_GOLD);
+        g.fillOval(panelX + 96, legendY + 51, 9, 9);
+        g.setFill(text);
+        g.fillText("有未拿取", panelX + 112, legendY + 60);
     }
 
     private void drawPhaseWall(GraphicsContext g, double x, double y, double width, double height,
@@ -772,6 +988,11 @@ public final class GameRenderer {
             g.setFill(i < player.getHp() ? Color.web("#d75b54") : Color.web("#3b2528"));
             g.fillOval(137 + i * 25.0, 76, 14, 14);
         }
+        // 当前层数放在第一行右侧：并进下面那行状态文字会顶出面板。
+        g.setFill(domain);
+        g.setFont(Font.font("Microsoft YaHei UI", FontWeight.BOLD, 15));
+        g.fillText("第 " + session.getFloor() + " / " + session.getTotalFloors() + " 层", 286, 91);
+        g.setFont(Font.font("Microsoft YaHei UI", FontWeight.BOLD, 17));
 
         g.setFill(Color.rgb(111, 177, 255, 0.9));
         g.fillText("攻击", 78, 130);
@@ -802,6 +1023,7 @@ public final class GameRenderer {
         g.setFill(Color.rgb(235, 226, 242, 0.64));
         g.fillText("光界残敌  " + session.getLightEnemyCount() + "     影界残敌  "
                 + session.getShadowEnemyCount() + "     金币  " + session.getCoins(), 78, 207);
+        g.setFont(Font.font("Microsoft YaHei UI", FontWeight.BOLD, 17));
 
         double badgeX = AppConfig.VIEW_WIDTH - 103.0;
         double badgeY = 105.0;

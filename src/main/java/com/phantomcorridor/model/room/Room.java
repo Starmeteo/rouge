@@ -91,6 +91,11 @@ public final class Room {
         return loot.hasContent() || hasUnopenedChest();
     }
 
+    /** 击败首领后出现的层间传送门：站在门前按 E 前往下一层。 */
+    public boolean hasPortal() {
+        return type == RoomType.BOSS && cleared;
+    }
+
     public double minX() { return areas.stream().mapToDouble(RoomArea::x).min().orElseThrow(); }
     public double minY() { return areas.stream().mapToDouble(RoomArea::y).min().orElseThrow(); }
     public double maxX() { return areas.stream().mapToDouble(a -> a.x() + a.width()).max().orElseThrow(); }
