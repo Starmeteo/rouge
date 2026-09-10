@@ -72,6 +72,23 @@ public final class RoomNavigationSystem {
         return true;
     }
 
+    /**
+     * 从起点到终点的整段路径是否都能容纳给定半径（不检查终点本身）。
+     *
+     * <p>用于「能不能直线走过去」这类判断：终点往往是玩家自己，而玩家脚下只保证放得下玩家身位，
+     * 若连终点也按敌人的半径要求，体型大的敌人贴到玩家身边反而会判定“过不去”。
+     */
+    public boolean isPathClearTo(double x1, double y1, double x2, double y2,
+                                 double radius, WorldType world) {
+        double distance = Math.hypot(x2 - x1, y2 - y1);
+        int steps = (int) Math.ceil(distance / Math.max(4.0, radius));
+        for (int i = 1; i < steps; i++) {
+            double t = i / (double) steps;
+            if (!canOccupy(x1 + (x2 - x1) * t, y1 + (y2 - y1) * t, radius, world)) return false;
+        }
+        return true;
+    }
+
     /** 切界前寻找目标世界最近的合法落点；找不到时由调用方拒绝切换。 */
     public double[] findNearestSafePosition(double originX, double originY, WorldType targetWorld) {
         if (canOccupy(originX, originY, GameConfig.PLAYER_RADIUS, targetWorld)) {

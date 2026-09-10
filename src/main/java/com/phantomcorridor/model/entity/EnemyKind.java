@@ -29,4 +29,12 @@ public enum EnemyKind {
     public int hitPoints() { return hitPoints; }
     public double speedMultiplier() { return speedMultiplier; }
     public String lightEffect() { return lightEffect; }
+
+    /** 远程物种保持距离并发射弹体；其余物种贴近到短距离后再攻击。 */
+    public boolean ranged() {
+        return switch (this) {
+            case LANTERN, MAGE, BELL, WATCHER -> true;
+            case WOLF, GOLEM, EXECUTIONER -> false;
+        };
+    }
 }

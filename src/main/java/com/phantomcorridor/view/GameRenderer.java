@@ -2,7 +2,9 @@ package com.phantomcorridor.view;
 
 import com.phantomcorridor.config.AppConfig;
 import com.phantomcorridor.config.GameConfig;
+import com.phantomcorridor.config.RoomConfig;
 import com.phantomcorridor.model.GameSession;
+import com.phantomcorridor.model.Pickup;
 import com.phantomcorridor.model.WorldType;
 import com.phantomcorridor.model.entity.Player;
 import com.phantomcorridor.model.entity.PlayerAnimationState;
@@ -37,6 +39,9 @@ public final class GameRenderer {
 
     private static final Color LIGHT_GOLD = Color.web("#e8bd68");
     private static final Color SHADOW_VIOLET = Color.web("#9b65dc");
+    /** 小地图：已清空的怪物房标记色与“还有东西可拿”的金点色。 */
+    private static final Color CLEARED_GREEN = Color.web("#7fbf7a");
+    private static final Color LOOT_GOLD = Color.web("#f7d56e");
     private static final Map<String, Image[]> LIGHT_FRAMES = loadCharacterFrames("white_cyan");
     private static final Map<String, Image[]> SHADOW_FRAMES = loadCharacterFrames("black_magenta");
     private static final Image[] LIGHT_BULLETS = loadSeries("white_cyan", "projectiles", "bullet_fly_right", 1);
@@ -265,6 +270,10 @@ public final class GameRenderer {
                 case ITEM -> Color.web("#70d8ff");
                 case EQUIPMENT -> Color.web("#f0c86e");
             };
+            // 商店商品额外画出价格，并标出“已选中、等待确认”的那一件。
+            int price = session.getShopPrice(pickup);
+            if (price >= 0) drawPriceTag(g, session, pickup, price);
+
             int icon = pickup.type() == com.phantomcorridor.model.Pickup.Type.COIN ? 1
                     : pickup.type() == com.phantomcorridor.model.Pickup.Type.ITEM ? 2 + Math.floorMod(pickup.amount(), 6) : -1;
             if (pickup.type() == com.phantomcorridor.model.Pickup.Type.EQUIPMENT) {
@@ -281,12 +290,17 @@ public final class GameRenderer {
                 g.setFill(color);
                 g.fillRect(pickup.x() - 7, pickup.y() - 7, 14, 14);
             }
+            if (price >= 0 && session.isShopOfferSelected(pickup)) {
+                g.setStroke(Color.web("#fff2b0"));
+                g.setLineWidth(3.0);
+                g.strokeRect(pickup.x() - 26, pickup.y() - 26, 52, 52);
+            }
             g.setStroke(Color.color(color.getRed(), color.getGreen(), color.getBlue(), .45));
             g.strokeRect(pickup.x() - 11, pickup.y() - 11, 22, 22);
         }
         if (session.isChestVisible()) {
             Room room = session.getNavigation().getCurrentRoom();
-            double x = room.doorCenter(Direction.NORTH), y = room.minY() + 76;
+            double x = room.doorCenter(Direction.NORTH), y = room.minY() + RoomConfig.CHEST_OFFSET_Y;
             if (REWARD_ICONS != null) {
                 double cellW = REWARD_ICONS.getWidth() / 4.0, cellH = REWARD_ICONS.getHeight() / 2.0;
                 g.drawImage(REWARD_ICONS, 0, 0, cellW, cellH, x - 32, y - 32, 64, 64);
@@ -313,14 +327,47 @@ public final class GameRenderer {
         g.setTextAlign(TextAlignment.LEFT);
     }
 
+    /** 商店商品的价格牌：买得起显示金色，买不起显示灰红色并写明状态。 */
+    private void drawPriceTag(GraphicsContext g, GameSession session, Pickup pickup, int price) {
+        boolean affordable = session.canAfford(pickup);
+        boolean selected = session.isShopOfferSelected(pickup);
+        String text = price + " 金币";
+        double width = 26 + text.length() * 8.0;
+        double x = pickup.x() - width / 2.0;
+        double y = pickup.y() + 30;
+        g.setFill(Color.rgb(8, 6, 12, selected ? 0.95 : 0.82));
+        g.fillRoundRect(x, y, width, 22, 7, 7);
+        g.setStroke(selected ? Color.web("#fff2b0")
+                : affordable ? Color.web("#f0c86e") : Color.web("#8a5a60"));
+        g.setLineWidth(selected ? 2.5 : 1.5);
+        g.strokeRoundRect(x, y, width, 22, 7, 7);
+        g.setFill(affordable ? Color.web("#ffe6a6") : Color.web("#c98f93"));
+        g.setFont(Font.font("Microsoft YaHei UI", FontWeight.BOLD, 13));
+        g.fillText(text, x + 13, y + 16);
+        if (selected) {
+            g.setFill(Color.web("#fff2b0"));
+            g.setFont(Font.font("Microsoft YaHei UI", FontWeight.BOLD, 12));
+            g.fillText(affordable ? "再按 E 确认" : "金币不足", x - 2, y + 40);
+        }
+    }
+
     private void drawInteractionPrompt(GraphicsContext g, GameSession session) {
         String prompt = session.getInteractionPrompt();
         if (prompt.isEmpty()) return;
         Player p = session.getPlayer();
-        g.setFill(Color.rgb(8, 6, 12, .9)); g.fillRoundRect(p.getX() + 24, p.getY() - 56, 108, 30, 8, 8);
-        g.setStroke(Color.web("#f2d27a")); g.strokeRoundRect(p.getX() + 24, p.getY() - 56, 108, 30, 8, 8);
-        g.setFill(Color.web("#fff0bb")); g.setFont(Font.font("Microsoft YaHei UI", FontWeight.BOLD, 13));
-        g.fillText(prompt, p.getX() + 35, p.getY() - 36);
+        boolean confirming = prompt.startsWith("E  确认") || prompt.startsWith("金币不足");
+        double width = 24 + prompt.length() * 13.0;
+        // 提示框贴着角色，但不能顶出画布：商店确认文案比旧提示长不少。
+        double x = Math.max(8, Math.min(p.getX() + 24, AppConfig.VIEW_WIDTH - width - 8));
+        double y = Math.max(8, p.getY() - 58);
+        g.setFill(Color.rgb(8, 6, 12, .92));
+        g.fillRoundRect(x, y, width, 32, 8, 8);
+        g.setStroke(confirming ? Color.web("#ffd766") : Color.web("#f2d27a"));
+        g.setLineWidth(confirming ? 2.5 : 1.0);
+        g.strokeRoundRect(x, y, width, 32, 8, 8);
+        g.setFill(confirming ? Color.web("#fff6cf") : Color.web("#fff0bb"));
+        g.setFont(Font.font("Microsoft YaHei UI", FontWeight.BOLD, 14));
+        g.fillText(prompt, x + 12, y + 21);
     }
 
     private void drawEquipmentBar(GraphicsContext g, GameSession session) {
@@ -476,11 +523,33 @@ public final class GameRenderer {
                 g.setLineWidth(2);
                 g.strokeRect(x - 5, y - 5, 10, 10);
             }
+            // 状态提示：已清空的怪物房套一圈绿框（不用再回去），还有东西可拿的房间点一颗金点。
+            if (room.isDefeatedBattleRoom()) {
+                g.setStroke(CLEARED_GREEN);
+                g.setLineWidth(2.0);
+                g.strokeRect(x - 8.5, y - 8.5, 17, 17);
+            }
+            if (room.hasRemainingLoot()) {
+                g.setFill(LOOT_GOLD);
+                g.fillOval(x + 2.5, y - 9.5, 7, 7);
+                g.setStroke(Color.rgb(30, 20, 8, 0.85));
+                g.setLineWidth(1.0);
+                g.strokeOval(x + 2.5, y - 9.5, 7, 7);
+            }
         }
         g.restore();
         g.setFill(Color.rgb(235, 226, 242, 0.76));
         g.setFont(Font.font("Consolas", FontWeight.BOLD, 12));
         g.fillText("探索地图", panelX + 12, panelY + panelSize + 18);
+        g.setFill(LOOT_GOLD);
+        g.fillOval(panelX + 12, panelY + panelSize + 25, 7, 7);
+        g.setFill(Color.rgb(235, 226, 242, 0.62));
+        g.fillText("有未拿取", panelX + 24, panelY + panelSize + 32);
+        g.setStroke(CLEARED_GREEN);
+        g.setLineWidth(2.0);
+        g.strokeRect(panelX + 96, panelY + panelSize + 23, 11, 11);
+        g.setFill(Color.rgb(235, 226, 242, 0.62));
+        g.fillText("已清空", panelX + 113, panelY + panelSize + 32);
     }
 
     private void drawPhaseWall(GraphicsContext g, double x, double y, double width, double height,

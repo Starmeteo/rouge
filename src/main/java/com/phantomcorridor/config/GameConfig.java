@@ -43,9 +43,68 @@ public final class GameConfig {
     /** 普通战斗房的敌人数量（含可能替换其中一只的精英）。 */
     public static final int BATTLE_ENEMY_MIN = 5;
     public static final int BATTLE_ENEMY_MAX = 7;
+
+    // ---- 索敌（敌人 AI 感知范围） ----
+    /** 敌人生成 / 重新回到当前世界后的首次开火前摇（秒），玩家进房后有一段可反应的缓冲。 */
     public static final double ENEMY_ALERT_TIME = 0.6;
+
+    /**
+     * 索敌是否覆盖整个房间。
+     *
+     * <p>开启后，同界敌人只要与玩家同处一房就会主动接近并攻击：房间内不再存在
+     * “站得太远所以完全不动”的敌人（旧版各物种只有 240～560 像素的索敌距离，
+     * 房间对角线却有约 1600 像素，站在另一头的敌人永远不会参战）。
+     * 关闭时退回到 {@link #ENEMY_DETECTION_RANGE} 的保守范围。
+     */
+    public static final boolean ENEMY_AGGRO_WHOLE_ROOM = true;
+
+    /** 整房索敌半径（像素）：取房间外接矩形对角线，保证房间内任何位置都在索敌范围内。 */
+    public static final double ENEMY_ROOM_AGGRO_RADIUS = Math.hypot(RoomConfig.ROOM_WIDTH, RoomConfig.ROOM_HEIGHT);
+
+    /** 未开启整房索敌时使用的固定索敌半径（像素，沿用旧版最远的守望者数值）。 */
+    public static final double ENEMY_DETECTION_RANGE = 560.0;
+
+    // ---- 敌人站位与开火距离 ----
+    /** 远程敌人（灯灵/法师/鸣钟者/守望者）的开火距离（像素）。 */
+    public static final double ENEMY_RANGED_ATTACK_RANGE = 620.0;
+
+    /** 近战敌人（影狼/傀儡/处刑者）的开火距离（像素）。 */
+    public static final double ENEMY_MELEE_ATTACK_RANGE = 150.0;
+
+    /** 远程敌人保持的站位距离（像素）。 */
+    public static final double ENEMY_RANGED_STANDOFF_DISTANCE = 190.0;
+
+    /** 近战敌人保持的站位距离（像素）。 */
+    public static final double ENEMY_MELEE_STANDOFF_DISTANCE = 105.0;
+
+    // ---- 敌人贴墙绕行（简易局部寻路） ----
+    /** 选择绕行方向时，沿途探测障碍的步长（像素）。 */
+    public static final double ENEMY_AVOIDANCE_PROBE_STEP = 12.0;
+
+    /** 选择绕行方向时的最大探测距离（像素）。 */
+    public static final double ENEMY_AVOIDANCE_PROBE_DISTANCE = 120.0;
+
+    /** 沿选定一侧完全走不动多久后改走另一侧（秒）：避免敌人被障碍卡死。 */
+    public static final double ENEMY_AVOIDANCE_FLIP_TIME = 1.0;
+
+    /**
+     * 绕行时允许的最小转角余弦值：0 表示最多转 90°，负值表示允许略大于 90°。
+     *
+     * <p>禁止掉头是关键——贴着墙时“直线朝玩家走一步、绕行再退回原处”会互相抵消，
+     * 敌人会永远停在同一个点上，看上去完全僵住。
+     */
+    public static final double ENEMY_AVOIDANCE_MIN_TURN_COSINE = -0.1;
+
     public static final double ENEMY_PROJECTILE_SPEED = 190.0;
-    public static final double ENEMY_PROJECTILE_LIFETIME = 3.0;
+
+    /**
+     * 敌方弹体寿命（秒）：由最大开火距离反推，留 30% 余量。
+     *
+     * <p>旧值固定 3.0 秒只够飞 570 像素，从最远处开火的弹体会在半路自行消失；
+     * 索敌范围扩大后这个数值必须跟着开火距离一起走。
+     */
+    public static final double ENEMY_PROJECTILE_LIFETIME = ENEMY_RANGED_ATTACK_RANGE * 1.3 / ENEMY_PROJECTILE_SPEED;
+
     public static final double ENEMY_PROJECTILE_RADIUS = 12.0;
     public static final double PLAYER_HIT_INVULNERABILITY = 0.65;
 
@@ -83,6 +142,24 @@ public final class GameConfig {
 
     /** 切界脉冲圆环的显示时间。 */
     public static final double PHASE_PULSE_VISIBLE_TIME = 0.32;
+
+    // ---- 第 7 天：房间内容与商店 ----
+    /** 玩家与拾取物/宝箱/事件的交互距离（像素）：提示与实际生效共用同一半径。 */
+    public static final double INTERACT_RADIUS = 96.0;
+
+    /**
+     * 商店里已选中、等待二次确认的商品在多远之后自动取消选择（像素）。
+     *
+     * <p>比 {@link #INTERACT_RADIUS} 略大一点点形成回差，避免玩家在边界上微动就丢掉选择；
+     * 但也不能大太多，否则玩家明明已经走开、回来时还停在“确认购买”上。
+     */
+    public static final double SHOP_CONFIRM_RESET_RADIUS = INTERACT_RADIUS + 16.0;
+
+    /** 每个商店房上架的商品件数。 */
+    public static final int SHOP_OFFER_COUNT = 2;
+
+    /** 商店同屏商品之间的摆放间距（像素）：必须大于两倍交互半径，玩家才需要走近某一件才能选中它。 */
+    public static final double SHOP_OFFER_SPACING = 240.0;
 
     /** 工具类：不允许实例化 */
     private GameConfig() {
