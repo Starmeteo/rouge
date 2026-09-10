@@ -1,0 +1,68 @@
+package com.phantomcorridor.model.combat;
+
+import com.phantomcorridor.model.WorldType;
+import com.phantomcorridor.model.entity.EnemyKind;
+
+import java.util.Arrays;
+import java.util.List;
+
+/**
+ * 敌人技能的游戏内索引。字段与 monster_pack_v1/combat_profiles.json 一一对应到动作和独立特效，
+ * 逻辑数值保留为易于试玩调整的首轮实现，而不是把不同怪物全压成同一颗圆形弹。
+ */
+public enum EnemySkill {
+    LANTERN_SEEKER(EnemyKind.LANTERN, WorldType.LIGHT, "attack", "seeker_orb", Pattern.PROJECTILE, .70, .85, 450, 14, 1, 175, 2.35),
+    LANTERN_NEEDLES(EnemyKind.LANTERN, WorldType.SHADOW, "attack", "dusk_needle", Pattern.SPREAD, .82, 1.05, 410, 10, 3, 275, 2.65),
+    WOLF_POUNCE(EnemyKind.WOLF, WorldType.LIGHT, "attack", "bite_flash", Pattern.DASH, .72, .78, 290, 54, 1, 0, 2.25),
+    WOLF_DASH_BITE(EnemyKind.WOLF, WorldType.SHADOW, "attack", "bite_arc", Pattern.DASH, .55, .88, 340, 58, 1, 0, 2.05),
+    GOLEM_CRACK(EnemyKind.GOLEM, WorldType.LIGHT, "attack", "ground_crack", Pattern.CRACK, 1.15, 1.25, 195, 48, 3, 0, 3.45),
+    GOLEM_SLAM(EnemyKind.GOLEM, WorldType.SHADOW, "attack", "slam_sector", Pattern.ARC, 1.05, 1.35, 180, 125, 1, 0, 3.35),
+    MAGE_FAN(EnemyKind.MAGE, WorldType.LIGHT, "attack", "fan_pellet", Pattern.FAN, .75, .82, 500, 11, 5, 230, 2.45),
+    MAGE_MIRROR(EnemyKind.MAGE, WorldType.SHADOW, "attack", "mirror_arc", Pattern.ARC, .90, 1.15, 205, 130, 1, 0, 2.85),
+    EXECUTIONER_SPEAR(EnemyKind.EXECUTIONER, WorldType.LIGHT, "attack", "spear_projectile", Pattern.PROJECTILE, 1.00, .90, 500, 16, 1, 360, 2.85),
+    EXECUTIONER_BASH(EnemyKind.EXECUTIONER, WorldType.LIGHT, "shield_bash", "shield_sector", Pattern.ARC, .78, .90, 165, 120, 1, 0, 2.55),
+    EXECUTIONER_COMBO(EnemyKind.EXECUTIONER, WorldType.SHADOW, "attack", "cleave_arc", Pattern.DOUBLE_ARC, .78, 1.15, 205, 130, 1, 0, 2.95),
+    EXECUTIONER_APPROACH(EnemyKind.EXECUTIONER, WorldType.SHADOW, "approach", "dash_dust", Pattern.DASH_NO_DAMAGE, .65, .45, 370, 0, 1, 0, 2.15),
+    BELL_RING(EnemyKind.BELL, WorldType.LIGHT, "attack", "bell_pellet", Pattern.RING, 1.30, 1.15, 400, 10, 9, 175, 3.85),
+    BELL_LIGHT_MARK(EnemyKind.BELL, WorldType.LIGHT, "ground_mark", "pillar_impact", Pattern.MARK, 1.05, .95, 520, 92, 1, 0, 3.35),
+    BELL_ANNULAR(EnemyKind.BELL, WorldType.SHADOW, "attack", "annular_burst", Pattern.RING_AREA, 1.20, 1.40, 245, 135, 1, 0, 3.75),
+    BELL_SHADOW_MARK(EnemyKind.BELL, WorldType.SHADOW, "ground_mark", "pillar_impact", Pattern.MARK, 1.05, .95, 500, 92, 1, 0, 3.35),
+    WATCHER_BARRAGE(EnemyKind.WATCHER, WorldType.LIGHT, "attack", "sun_pellet", Pattern.DOUBLE_RING, .90, 1.05, 540, 13, 16, 205, 3.10),
+    WATCHER_JUDGMENT(EnemyKind.WATCHER, WorldType.LIGHT, "judgment", "pillar_impact", Pattern.TRIPLE_MARK, 1.05, 1.10, 580, 82, 3, 0, 3.35),
+    WATCHER_SPEAR(EnemyKind.WATCHER, WorldType.LIGHT, "rift_spear", "rift_spear", Pattern.PROJECTILE, 1.10, 1.15, 610, 20, 1, 350, 3.55),
+    WATCHER_DOUBLE_SLASH(EnemyKind.WATCHER, WorldType.SHADOW, "attack", "slash_arc", Pattern.DOUBLE_ARC, .85, 1.20, 235, 155, 1, 0, 3.15),
+    WATCHER_DASH(EnemyKind.WATCHER, WorldType.SHADOW, "dash", "dash_trail", Pattern.DASH, .85, 1.20, 470, 92, 1, 0, 3.05),
+    WATCHER_SUMMON(EnemyKind.WATCHER, WorldType.SHADOW, "summon", "summon_portal", Pattern.SUMMON, 1.10, 1.40, 540, 0, 1, 0, 5.40);
+
+    public enum Pattern { PROJECTILE, SPREAD, FAN, RING, DOUBLE_RING, ARC, DOUBLE_ARC, DASH, DASH_NO_DAMAGE, CRACK, MARK, TRIPLE_MARK, RING_AREA, SUMMON }
+
+    private final EnemyKind kind;
+    private final WorldType world;
+    private final String actionBase;
+    private final String effect;
+    private final Pattern pattern;
+    private final double windup, recovery, range, radius, speed, cooldown;
+    private final int count;
+
+    EnemySkill(EnemyKind kind, WorldType world, String actionBase, String effect, Pattern pattern,
+               double windup, double recovery, double range, double radius, int count, double speed, double cooldown) {
+        this.kind = kind; this.world = world; this.actionBase = actionBase; this.effect = effect; this.pattern = pattern;
+        this.windup = windup; this.recovery = recovery; this.range = range; this.radius = radius;
+        this.count = count; this.speed = speed; this.cooldown = cooldown;
+    }
+    public EnemyKind kind() { return kind; }
+    public WorldType world() { return world; }
+    public String actionBase() { return actionBase; }
+    public String effect() { return effect; }
+    public Pattern pattern() { return pattern; }
+    public double windup() { return windup; }
+    public double recovery() { return recovery; }
+    public double range() { return range; }
+    public double radius() { return radius; }
+    public int count() { return count; }
+    public double speed() { return speed; }
+    public double cooldown() { return cooldown; }
+    public static List<EnemySkill> forEnemy(EnemyKind kind, WorldType world) {
+        return Arrays.stream(values()).filter(skill -> skill.kind == kind && skill.world == world).toList();
+    }
+}

@@ -15,6 +15,7 @@ public final class Player {
     private int hp;
     private double x;
     private double y;
+    private int coins;
     private double phaseEnergy;
     private int attackCharges;
     private int maxAttackCharges;
@@ -36,6 +37,7 @@ public final class Player {
         this.hp = GameConfig.PLAYER_MAX_HP;
         this.x = x;
         this.y = y;
+        this.coins = 0;
         this.phaseEnergy = GameConfig.PHASE_ENERGY_INITIAL;
         this.maxAttackCharges = GameConfig.ATTACK_CHARGE_MAX;
         this.attackCharges = maxAttackCharges;
@@ -141,6 +143,18 @@ public final class Player {
     public void restoreHealth(int amount) { hp = Math.min(GameConfig.PLAYER_MAX_HP, hp + Math.max(0, amount)); }
     public double getX() { return x; }
     public double getY() { return y; }
+
+    /** 本局金币：击杀、奖励房与宝箱获得，商店消费。 */
+    public int getCoins() { return coins; }
+
+    public void addCoins(int amount) { coins = Math.max(0, coins + Math.max(0, amount)); }
+
+    /** 扣款；金币不足时不扣并在返回 false。 */
+    public boolean spendCoins(int amount) {
+        if (amount < 0 || coins < amount) return false;
+        coins -= amount;
+        return true;
+    }
     public double getPhaseEnergy() { return phaseEnergy; }
     public int getAttackCharges() { return attackCharges; }
     public int getMaxAttackCharges() { return maxAttackCharges; }

@@ -15,10 +15,10 @@ public final class Room {
     private final RoomShape shape;
     private final List<RoomArea> areas;
     private final List<Wall> walls;
+    private final RoomLoot loot = new RoomLoot();
     private boolean cleared;
     private boolean discovered;
     private boolean visited;
-    private boolean rewardClaimed;
 
     public Room(int id, RoomType type, int mapX, int mapY) {
         this(id, type, mapX, mapY, Objects.hash(id, type, mapX, mapY));
@@ -68,8 +68,33 @@ public final class Room {
     public boolean isVisited() { return visited; }
     public void discover() { discovered = true; }
     public void visit() { discovered = true; visited = true; }
-    public boolean isRewardClaimed() { return rewardClaimed; }
-    public void claimReward() { rewardClaimed = true; }
+
+    /** 房间内可交互内容的持久状态（货架、宝箱、事件）：进出房间不会重置。 */
+    public RoomLoot loot() { return loot; }
+
+    /** 战斗/首领房是否已经清空：已清空的房间再次进入不会重新刷怪。 */
+    public boolean isDefeatedBattleRoom() {
+        return cleared && (type == RoomType.BATTLE || type == RoomType.BOSS);
+    }
+
+    /**
+     * 清空后尚未打开的宝箱：战斗房与首领房清空后出现，一直保留到玩家打开为止。
+     *
+     * <p>事件房不在此列——那里清完伏击的奖励就是事件本身的结算结果。
+     */
+    public boolean hasUnopenedChest() {
+        return (type == RoomType.BATTLE || type == RoomType.BOSS) && cleared && !loot.isChestOpened();
+    }
+
+    /** 房间里是否还有玩家没拿的东西（未拾取物、未开宝箱、未触发事件）：供小地图提示。 */
+    public boolean hasRemainingLoot() {
+        return loot.hasContent() || hasUnopenedChest();
+    }
+
+    /** 击败首领后出现的层间传送门：站在门前按 E 前往下一层。 */
+    public boolean hasPortal() {
+        return type == RoomType.BOSS && cleared;
+    }
 
     public double minX() { return areas.stream().mapToDouble(RoomArea::x).min().orElseThrow(); }
     public double minY() { return areas.stream().mapToDouble(RoomArea::y).min().orElseThrow(); }

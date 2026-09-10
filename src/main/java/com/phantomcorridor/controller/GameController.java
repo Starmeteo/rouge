@@ -4,6 +4,7 @@ import com.phantomcorridor.core.GameLoop;
 import com.phantomcorridor.model.GameSession;
 import com.phantomcorridor.view.GameView;
 import javafx.scene.input.KeyCode;
+import com.phantomcorridor.config.AppConfig;
 import com.phantomcorridor.config.Settings;
 
 /** 游戏输入、模型更新和渲染调度。 */
@@ -16,6 +17,7 @@ public final class GameController {
     private final GameLoop loop;
     private boolean running;
     private boolean shiftHeld;
+    private boolean interactHeld;
     private boolean attackHeld;
     private double aimX;
     private double aimY;
@@ -44,6 +46,7 @@ public final class GameController {
         };
         view.bindInput(this::keyPressed, this::keyReleased);
         view.bindPointer(this::pointerMoved, held -> attackHeld = held);
+        view.bindClick(this::pointerClicked);
         view.bindLifecycle(this::start, this::stop);
         session.newRun(settings.getDevSeed());
     }
@@ -52,6 +55,7 @@ public final class GameController {
         session.newRun(settings.getDevSeed());
         input.clear();
         shiftHeld = false;
+        interactHeld = false;
         attackHeld = false;
         aimX = session.getPlayer().getX() + 1.0;
         aimY = session.getPlayer().getY();
@@ -72,11 +76,17 @@ public final class GameController {
         }
         input.clear();
         shiftHeld = false;
+        interactHeld = false;
         attackHeld = false;
     }
 
     private void keyPressed(KeyCode key) {
         if (session.getPlayer().getHp() <= 0) {
+            // 死亡结算保持“只能点击按钮”的交互约定。
+            return;
+        }
+        // 通关结算沿用上游的快捷重开/返回主菜单。
+        if (session.isRunCleared()) {
             if (key == KeyCode.R) newRun();
             else if (key == KeyCode.M) onMainMenu.run();
             return;
@@ -92,7 +102,11 @@ public final class GameController {
                 }
                 shiftHeld = true;
             }
-            case E -> session.requestInteract();
+            case E -> {
+                // 长按会连发 keyPressed：交互（尤其商店的二次确认）必须一次按下只算一次。
+                if (!interactHeld) session.requestInteract();
+                interactHeld = true;
+            }
             case ESCAPE, P -> onPauseRequested.run();
             default -> { }
         }
@@ -105,6 +119,7 @@ public final class GameController {
             case A, LEFT -> input.setLeft(false);
             case D, RIGHT -> input.setRight(false);
             case TAB -> shiftHeld = false;
+            case E -> interactHeld = false;
             default -> { }
         }
     }
@@ -112,5 +127,18 @@ public final class GameController {
     private void pointerMoved(double x, double y) {
         aimX = x;
         aimY = y;
+    }
+
+    private void pointerClicked(double x, double y) {
+        if (session.getPlayer().getHp() > 0) return;
+        double centerX = AppConfig.VIEW_WIDTH / 2.0;
+        double centerY = AppConfig.VIEW_HEIGHT / 2.0;
+        double buttonY = centerY + 44.0;
+        if (y < buttonY || y > buttonY + 50.0) return;
+        if (x >= centerX - 170.0 && x <= centerX - 30.0) {
+            newRun();
+        } else if (x >= centerX + 30.0 && x <= centerX + 170.0) {
+            onMainMenu.run();
+        }
     }
 }

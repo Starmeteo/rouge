@@ -12,11 +12,17 @@ public final class MapGenerator {
     private static final RoomType[] RANDOM_TYPES = {RoomType.BATTLE, RoomType.REWARD, RoomType.SHOP, RoomType.EVENT};
     private static final double[] WEIGHTS = {RoomConfig.WEIGHT_BATTLE, RoomConfig.WEIGHT_REWARD,
             RoomConfig.WEIGHT_SHOP, RoomConfig.WEIGHT_EVENT};
+    /** 剔除商店后的权重：入口附近重roll 时使用，避免开局第一间就是商店。 */
+    private static final RoomType[] EARLY_TYPES = {RoomType.BATTLE, RoomType.REWARD, RoomType.EVENT};
+    private static final double[] EARLY_WEIGHTS = {RoomConfig.WEIGHT_BATTLE, RoomConfig.WEIGHT_REWARD,
+            RoomConfig.WEIGHT_EVENT};
 
     public DungeonMap generate(long seed) {
         Random random = new Random(seed);
         List<Room> rooms = new ArrayList<>();
         rooms.add(new Room(0, RoomType.ENTRANCE, 0, 0));
+        Map<Integer, Integer> depths = new HashMap<>();
+        depths.put(0, 0);
         Set<String> occupied = new HashSet<>();
         occupied.add("0,0");
         for (int id = 1; id < RoomConfig.DEFAULT_ROOM_COUNT; id++) {
@@ -29,15 +35,30 @@ public final class MapGenerator {
             Direction direction = findFreeDirection(random, parent, occupied);
             int x = parent.mapX() + direction.dx();
             int y = parent.mapY() + direction.dy();
+            int depth = depths.getOrDefault(parent.id(), 0) + 1;
             RoomType type = id == RoomConfig.DEFAULT_ROOM_COUNT - 1 ? RoomType.BOSS
-                    : RANDOM_TYPES[RandomUtil.weightedIndex(random, WEIGHTS)];
+                    : rollType(random, depth);
             Room room = new Room(id, type, x, y, random.nextLong());
             parent.connect(direction, id);
             room.connect(direction.opposite(), parent.id());
             rooms.add(room);
+            depths.put(id, depth);
             occupied.add(x + "," + y);
         }
         return new DungeonMap(rooms);
+    }
+
+    /**
+     * 抽取房间类型。
+     *
+     * <p>距离入口不足 {@link RoomConfig#SHOP_MIN_DEPTH} 的房间不生成商店：
+     * 那时玩家既没金币也没得挑，商店开在出生点旁边没有意义。
+     */
+    private RoomType rollType(Random random, int depth) {
+        if (depth >= RoomConfig.SHOP_MIN_DEPTH) {
+            return RANDOM_TYPES[RandomUtil.weightedIndex(random, WEIGHTS)];
+        }
+        return EARLY_TYPES[RandomUtil.weightedIndex(random, EARLY_WEIGHTS)];
     }
 
     private boolean hasFreeDirection(Room room, Set<String> occupied) {
