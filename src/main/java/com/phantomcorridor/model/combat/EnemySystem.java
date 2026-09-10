@@ -48,10 +48,24 @@ public final class EnemySystem {
     /** 守望者的血量召唤阶段：血量第一次跌破这些比例时立刻召唤一次（无视冷却）。 */
     private static final double[] SUMMON_STAGE_HP = {0.70, 0.35};
 
+    /** 受击飘字的停留时间（秒）。 */
+    private static final double DAMAGE_FLASH_TIME = 0.85;
+
+    /**
+     * 一次受击的飘字反馈。
+     *
+     * @param value     飘出的数字：护盾全吸收时是被挡下的点数，否则是实际掉的血
+     * @param onShield  本次是否只打掉了护盾（渲染层据此换成护盾色）
+     * @param damagedHp 本次是否真的伤到了生命值（护盾只挡掉一部分时为 true）
+     */
+    public record DamageFlash(double x, double y, double value, DamageType type,
+                              boolean onShield, boolean damagedHp, double remaining) { }
+
     private final List<Enemy> enemies = new ArrayList<>();
     private final List<EnemyAttack> attacks = new ArrayList<>();
     private final List<EnemyVisualEffect> visualEffects = new ArrayList<>();
     private final List<SummonRift> summonRifts = new ArrayList<>();
+    private final List<DamageFlash> damageFlashes = new ArrayList<>();
     private final Map<Enemy, ActiveCast> activeCasts = new HashMap<>();
     private final EnumMap<WorldType, Map<Integer, RoomFlowField>> flowFields = new EnumMap<>(WorldType.class);
     private int activeRoomId = -1;
@@ -69,6 +83,7 @@ public final class EnemySystem {
         attacks.clear();
         visualEffects.clear();
         summonRifts.clear();
+        damageFlashes.clear();
         activeCasts.clear();
         flowFields.clear();
         activeRoomId = -1;
@@ -140,6 +155,7 @@ public final class EnemySystem {
     public void update(double dt, Player player, PlayerAttackSystem playerAttacks,
                        RoomNavigationSystem navigation) {
         updateBlinkFlash(dt);
+        updateDamageFlashes(dt);
         resolvePlayerHits(player, playerAttacks);
         visualEffects.forEach(effect -> effect.update(dt));
         visualEffects.removeIf(EnemyVisualEffect::expired);
@@ -209,6 +225,22 @@ public final class EnemySystem {
                 : new BlinkFlash(blinkFlash.fromX(), blinkFlash.fromY(),
                 blinkFlash.toX(), blinkFlash.toY(), remaining);
     }
+
+    /**
+     * 受击飘字同样只是视觉残留。
+     *
+     * <p>飘字列表必须在这里推进：它同时承载“玩家挨了多少”和“敌人掉了多少”，
+     * 由渲染层只读地画出来，逻辑层不依赖任何渲染帧。
+     */
+    private void updateDamageFlashes(double dt) {
+        if (damageFlashes.isEmpty()) return;
+        damageFlashes.replaceAll(flash -> new DamageFlash(flash.x(), flash.y(), flash.value(), flash.type(),
+                flash.onShield(), flash.damagedHp(), flash.remaining() - Math.max(0.0, dt)));
+        damageFlashes.removeIf(flash -> flash.remaining() <= 0.0);
+    }
+
+    /** 当前还在显示的受击飘字（玩家挨打 / 敌人掉血）。 */
+    public List<DamageFlash> getDamageFlashes() { return Collections.unmodifiableList(damageFlashes); }
 
     /**
      * 被墙卡住时的脱困兜底。
@@ -345,12 +377,14 @@ public final class EnemySystem {
 
     private void resolvePlayerHits(Player player, PlayerAttackSystem playerAttacks) {
         // 伤害统一走 Enemy.takeHit：先扣防御，并保证每次至少造成 1 点。
+        // 玩家伤害与敌人生命、防御共用同一个难度倍率，高难度下不会变成“同一个敌人多打一倍次数”。
+        int attackDamage = scaledPlayerDamage(player.getAttackDamage());
         for (Projectile projectile : playerAttacks.getProjectiles()) {
             for (Enemy enemy : enemies) {
                 if (!enemy.isDead() && projectile.getWorld() == enemy.getWorld()
                         && CollisionUtil.circleIntersectsCircle(projectile.getX(), projectile.getY(), projectile.getRadius(),
                         enemy.getHitboxCenterX(), enemy.getHitboxCenterY(), enemy.getHitboxRadius())) {
-                    enemy.takeHit(player.getAttackDamage());
+                    recordEnemyHit(enemy, enemy.takeHit(attackDamage));
                     projectile.expire();
                     break;
                 }
@@ -362,12 +396,36 @@ public final class EnemySystem {
                 if (enemy.getWorld() != WorldType.SHADOW || enemy.getLastMeleeHitId() == attackId) continue;
                 if (Math.hypot(enemy.getHitboxCenterX() - player.getX(), enemy.getHitboxCenterY() - player.getY())
                         <= GameConfig.SHADOW_MELEE_RANGE + enemy.getHitboxRadius()) {
-                    enemy.takeHit(player.getAttackDamage());
+                    recordEnemyHit(enemy, enemy.takeHit(attackDamage));
                     enemy.setLastMeleeHitId(attackId);
                 }
             }
         }
     }
+
+    /**
+     * 玩家一击打出的伤害（含难度倍率）。
+     *
+     * <p>低难度下敌人生命只有一半，玩家伤害同步减半，双方比值不变；
+     * 「简单」依然更简单，靠的是敌人总量与玩家容错，而不是把玩家也一起削。
+     */
+    private int scaledPlayerDamage(int baseDamage) {
+        return Math.max(1, (int) Math.round(baseDamage * difficulty.playerDamageMultiplier()));
+    }
+
+    /**
+     * 记下玩家打出的这一击，供渲染层在敌人头顶飘出伤害数字。
+     *
+     * <p>画在敌人**头顶**而不是命中点：弹体命中后会立刻失效，
+     * 挂在弹体位置上的数字会跟着一起消失。
+     */
+    private void recordEnemyHit(Enemy enemy, int dealt) {
+        if (dealt <= 0) return;
+        double height = enemy.isBoss() ? 168.0 : enemy.getKind().elite() ? 124.0 : 96.0;
+        damageFlashes.add(new DamageFlash(enemy.getX(), enemy.getY() - height - 16.0, dealt,
+                DamageType.PHYSICAL, false, true, DAMAGE_FLASH_TIME));
+    }
+
 
     private void moveTowardPlayer(Enemy enemy, Player player, RoomNavigationSystem navigation,
                                   double dt, boolean lineOfSight) {
@@ -765,7 +823,8 @@ public final class EnemySystem {
 
     private void projectile(Enemy enemy, EnemySkill skill, double angle) {
         attacks.add(new EnemyAttack(enemy.getX(), enemy.getY(), Math.cos(angle) * skill.speed(), Math.sin(angle) * skill.speed(),
-                skill.radius(), enemy.getWorld(), enemy.getKind(), 3.2, skill.effect(), angle, 0.0));
+                skill.radius(), enemy.getWorld(), enemy.getKind(), 3.2, skill.effect(), angle, 0.0,
+                scaledDamage(skill)));
     }
     private void spread(Enemy enemy, EnemySkill skill, double angle, int count, double spacingDegrees) {
         for (int i = 0; i < count; i++) projectile(enemy, skill, angle + Math.toRadians((i - (count - 1) / 2.0) * spacingDegrees));
@@ -777,7 +836,7 @@ public final class EnemySystem {
     private void area(Enemy enemy, EnemySkill skill, double x, double y, double angle,
                       double duration, double delay) {
         attacks.add(new EnemyAttack(x, y, 0, 0, skill.radius(), enemy.getWorld(), enemy.getKind(), duration,
-                skill.effect(), angle, delay));
+                skill.effect(), angle, delay, scaledDamage(skill)));
     }
     private void dash(Enemy enemy, EnemySkill skill, double angle, RoomNavigationSystem navigation) {
         double distance = skill.kind() == EnemyKind.WATCHER ? 260 : 170;
@@ -789,6 +848,16 @@ public final class EnemySystem {
         if (skill.pattern() == EnemySkill.Pattern.DASH) {
             area(enemy, skill, enemy.getX(), enemy.getY(), angle, .15, .05);
         }
+    }
+
+    /**
+     * 招式伤害随本局难度缩放。
+     *
+     * <p>与敌人的生命、防御用同一个倍率：难度改的是双方数值的整体刻度，
+     * 而不是单方面把敌人堆厚（否则高难度只会变成“同样的招式挨更多下才死”）。
+     */
+    private double scaledDamage(EnemySkill skill) {
+        return skill.damage() * difficulty.playerDamageMultiplier();
     }
     /**
      * 打开召唤裂隙：不直接生成召唤物，只在预定落点留下几道正在成型的裂隙。
@@ -828,7 +897,8 @@ public final class EnemySystem {
             if (!attack.isExpired() && attack.getWorld() == player.getCurrentWorld()
                     && CollisionUtil.circleIntersectsCircle(attack.getX(), attack.getY(), attack.getRadius(),
                     player.getX(), player.getY(), GameConfig.PLAYER_RADIUS)) {
-                player.takeDamage(1);
+                // 伤害跟着这一招自己的数值走：傀儡的践踏与灯魇的小弹不再打掉同样多的血。
+                resolvePlayerHit(player, attack);
                 attack.expire();
             }
             if (attack.isExpired() && attack.consumeImpact()) {
@@ -839,6 +909,22 @@ public final class EnemySystem {
         }
         attacks.removeIf(EnemyAttack::isExpired);
     }
+
+    /**
+     * 把一次命中的伤害落到玩家身上：先由护盾吸收，剩下打进生命值。
+     *
+     * <p>飘字画在玩家头顶而不是弹体身上——弹体命中后立刻消失，飘在弹体位置会跟着一起没。
+     */
+    private void resolvePlayerHit(Player player, EnemyAttack attack) {
+        Player.DamageResult result = player.takeDamage(attack.getDamage(), attack.getDamageType());
+        if (result == null) return;   // 无敌帧内或零伤害：不重复扣血，也不飘字
+        boolean onShield = result.healthLost() <= 0 && result.absorbedByShield() > 0.0;
+        damageFlashes.add(new DamageFlash(player.getX(), player.getY() - 62.0,
+                onShield ? result.absorbedByShield() : result.healthLost(),
+                result.type(), onShield, !onShield && result.absorbedByShield() > 0.0,
+                DAMAGE_FLASH_TIME));
+    }
+
 
     private static String impactEffect(EnemyKind kind, WorldType world) {
         boolean light = world == WorldType.LIGHT;
@@ -873,6 +959,21 @@ public final class EnemySystem {
     public boolean isRoomCleared() { return enemies.isEmpty(); }
     public int getCount(WorldType world) { return (int) enemies.stream().filter(enemy -> enemy.getWorld() == world).count(); }
     public int consumeKills() { int result = killsSinceLastRead; killsSinceLastRead = 0; return result; }
+
+    /**
+     * 只投放一只指定物种的敌人，位置交给调用方设置。
+     *
+     * <p>给测试与后续调试场景使用：正常流程一律走 {@link #enterRoom} 的按房生成，
+     * 那条路径的物种与站位都由种子决定，没法用来单独核对某个物种的伤害数值。
+     *
+     * @return 新生成的敌人
+     */
+    public Enemy spawnForTest(EnemyKind kind, WorldType world, int floor, Difficulty difficulty) {
+        Enemy enemy = new Enemy(kind, world, 0.0, 0.0, Math.max(1, floor),
+                difficulty == null ? Difficulty.NORMAL : difficulty);
+        enemies.add(enemy);
+        return enemy;
+    }
 
     /** 自上帧以来首领起手召唤的次数：会话层据此提醒玩家“增援来了”。 */
     public int consumeSummonCalls() { int result = summonCallsSinceLastRead; summonCallsSinceLastRead = 0; return result; }
