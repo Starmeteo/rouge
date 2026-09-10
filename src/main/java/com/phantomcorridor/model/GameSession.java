@@ -8,10 +8,9 @@ import com.phantomcorridor.model.combat.PlayerAttackSystem;
 import com.phantomcorridor.model.combat.EnemyProjectileSystem;
 import com.phantomcorridor.model.combat.EnemySystem;
 import com.phantomcorridor.model.dungeon.MapGenerator;
+import com.phantomcorridor.model.room.RoomContentSystem;
 import com.phantomcorridor.model.room.RoomNavigationSystem;
 import com.phantomcorridor.model.room.Room;
-import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
 
 /** 一局游戏的聚合状态。后续房间、敌人、掉落都从这里接入。 */
@@ -23,6 +22,7 @@ public final class GameSession {
     private final EnemyProjectileSystem enemyProjectiles = new EnemyProjectileSystem();
     private final EnemySystem enemies = new EnemySystem();
     private final RoomNavigationSystem navigation = new RoomNavigationSystem();
+    private final RoomContentSystem roomContent = new RoomContentSystem();
     private long dungeonSeed;
     private double phasePulseVisibleRemaining;
     private double aimX;
@@ -30,13 +30,7 @@ public final class GameSession {
     private String roomAnnouncement = "";
     private double roomAnnouncementRemaining;
     private boolean combatActive;
-    private int coins;
-    private final List<Pickup> pickups = new ArrayList<>();
-    private boolean chestVisible;
-    private boolean chestOpened;
-    private boolean chestRewardGranted;
     private boolean interactRequested;
-    private boolean eventPending;
 
     public void newRun() { newRun(""); }
 
@@ -52,11 +46,11 @@ public final class GameSession {
         aimX = player.getX() + 1.0;
         aimY = player.getY();
         combatActive = false;
-        coins = 0;
-        pickups.clear(); chestVisible = false; chestOpened = false; chestRewardGranted = false; eventPending = false;
         dungeonSeed = MapGenerator.parseSeed(configuredSeed);
+        roomContent.reset(dungeonSeed);
         navigation.reset(new MapGenerator().generate(dungeonSeed));
         navigation.placeAtEntrance(player);
+        roomContent.enterRoom(navigation.getCurrentRoom(), player);
         enemies.enterRoom(navigation.getCurrentRoom(), dungeonSeed, player, navigation);
     }
 
@@ -74,43 +68,29 @@ public final class GameSession {
         navigation.move(player, movementX, movementY, dt);
         if (navigation.consumeRoomChanged()) {
             attackSystem.clearTransientAttacks();
-            enemies.enterRoom(navigation.getCurrentRoom(), dungeonSeed, player, navigation);
-            roomAnnouncement = roomTypeLabel(navigation.getCurrentRoom().type());
-            roomAnnouncementRemaining = 2.2;
-            pickups.clear(); chestVisible = false; chestOpened = false; chestRewardGranted = false; eventPending = false;
             Room entered = navigation.getCurrentRoom();
-            if (!entered.isRewardClaimed()) {
-                switch (entered.type()) {
-                    case REWARD -> {
-                        pickups.add(new Pickup(Pickup.Type.COIN, player.getX() + 36, player.getY(), 5));
-                        pickups.add(new Pickup(Pickup.Type.EQUIPMENT, player.getX() - 36, player.getY(),
-                                Math.floorMod((int) (dungeonSeed + entered.id()), EquipmentType.values().length)));
-                    }
-                    case EVENT -> eventPending = true;
-                    case SHOP -> pickups.add(new Pickup(Pickup.Type.EQUIPMENT, currentRoomCenterX(), currentRoomCenterY(),
-                            Math.floorMod((int) (dungeonSeed + entered.id()), EquipmentType.values().length)));
-                    default -> { }
-                }
-                entered.claimReward();
-            }
+            roomContent.enterRoom(entered, player);
+            enemies.enterRoom(entered, dungeonSeed, player, navigation);
+            roomAnnouncement = roomTypeLabel(entered.type());
+            roomAnnouncementRemaining = 2.2;
         }
+        // 房间内容只在第一次进入时生成，进出不会重刷；这里只维护“待确认商品”的有效性。
+        roomContent.update(navigation.getCurrentRoom(), player);
         attackSystem.update(dt, navigation);
         enemies.update(dt, player, attackSystem, navigation);
         int kills = enemies.consumeKills();
-        if (navigation.getCurrentRoom().type() == RoomType.BATTLE
-                || navigation.getCurrentRoom().type() == RoomType.BOSS
-                || navigation.getCurrentRoom().type() == RoomType.EVENT) {
-            navigation.getCurrentRoom().setCleared(enemies.isRoomCleared());
-            if (navigation.getCurrentRoom().isCleared() && kills > 0) {
-                chestVisible = true;
-                // 宝箱本体由北侧绘制，奖励在按键打开后生成。
-            }
+        Room current = navigation.getCurrentRoom();
+        if (current.type() == RoomType.BATTLE || current.type() == RoomType.BOSS
+                || current.type() == RoomType.EVENT) {
+            current.setCleared(enemies.isRoomCleared());
         }
         if (kills > 0) player.restorePhaseEnergy(kills * GameConfig.PHASE_ENERGY_PER_FRAGMENT);
-        if (kills > 0) coins += kills + Math.floorMod((int) (dungeonSeed + kills * 13L), kills * 3 + 1);
+        if (kills > 0) player.addCoins(kills + Math.floorMod((int) (dungeonSeed + kills * 13L), kills * 3 + 1));
         combatActive = !enemies.isRoomCleared();
-        Room current = navigation.getCurrentRoom();
-        if (interactRequested) { interactRequested = false; interactNearby(current); }
+        if (interactRequested) {
+            interactRequested = false;
+            interact(current);
+        }
         player.restorePhaseEnergy(GameConfig.PHASE_ENERGY_REGEN_PER_SEC * dt);
         player.updateAttackCharges(dt);
         if (attacking) {
@@ -146,75 +126,43 @@ public final class GameSession {
     public double getAimY() { return aimY; }
     public int getLightEnemyCount() { return enemies.getCount(WorldType.LIGHT); }
     public int getShadowEnemyCount() { return enemies.getCount(WorldType.SHADOW); }
-    public int getCoins() { return coins; }
-    public List<Pickup> getPickups() { return Collections.unmodifiableList(pickups); }
-    public boolean isChestVisible() { return chestVisible && !chestOpened; }
+    public int getCoins() { return player.getCoins(); }
     public RoomNavigationSystem getNavigation() { return navigation; }
     public long getDungeonSeed() { return dungeonSeed; }
     public boolean isRoomAnnouncementVisible() { return roomAnnouncementRemaining > 0.0; }
     public String getRoomAnnouncement() { return roomAnnouncement; }
     public double getRoomAnnouncementRemaining() { return roomAnnouncementRemaining; }
     public void requestInteract() { interactRequested = true; }
+
+    /** 当前房间地面上的拾取物：挂在房间上，所以离开再回来东西还在。 */
+    public List<Pickup> getPickups() { return navigation.getCurrentRoom().loot().pickupsView(); }
+
+    /** 当前房间是否有没打开的宝箱。 */
+    public boolean isChestVisible() { return navigation.getCurrentRoom().hasUnopenedChest(); }
+
     public String getInteractionPrompt() {
-        Room room = navigation.getCurrentRoom();
-        if (chestVisible && !chestOpened && Math.hypot(player.getX() - room.doorCenter(com.phantomcorridor.model.room.Direction.NORTH),
-                player.getY() - room.minY() - 70) < 150) return "E  打开";
-        if (eventPending && room.type() == RoomType.EVENT) return "E  触发事件";
-        for (Pickup p : pickups) if (Math.hypot(p.x() - player.getX(), p.y() - player.getY()) < 120) {
-            return p.type() == Pickup.Type.EQUIPMENT && room.type() == RoomType.SHOP ? "E  购买"
-                    : p.type() == Pickup.Type.EQUIPMENT ? "E  装备" : "E  拾取";
-        }
-        return "";
+        return roomContent.prompt(navigation.getCurrentRoom(), player);
     }
-    private void interactNearby(Room current) {
-        if (eventPending && current.type() == RoomType.EVENT) {
-            eventPending = false;
-            int roll = Math.floorMod((int) (dungeonSeed + current.id() * 17L), 4);
-            if (roll == 0) pickups.add(new Pickup(Pickup.Type.HEALTH, currentRoomCenterX(), currentRoomCenterY(), 2));
-            else if (roll == 1) pickups.add(new Pickup(Pickup.Type.PHASE_FRAGMENT, currentRoomCenterX(), currentRoomCenterY(), 3));
-            else if (roll == 2) pickups.add(new Pickup(Pickup.Type.EQUIPMENT, currentRoomCenterX(), currentRoomCenterY(),
-                    Math.floorMod((int) (dungeonSeed + current.id()), EquipmentType.values().length)));
-            else { enemies.spawnEventEnemies(current, dungeonSeed, player, navigation); current.setCleared(false); }
-            return;
-        }
-        if (chestVisible && !chestOpened && Math.hypot(player.getX() - current.doorCenter(com.phantomcorridor.model.room.Direction.NORTH),
-                player.getY() - current.minY() - 70) < 100) {
-            chestOpened = true;
-            if (!chestRewardGranted) {
-                chestRewardGranted = true;
-                double x = current.doorCenter(com.phantomcorridor.model.room.Direction.NORTH), y = current.minY() + 76;
-                int reward = Math.floorMod((int) (dungeonSeed + current.id() * 31L), 4);
-                if (reward == 0) pickups.add(new Pickup(Pickup.Type.COIN, x, y, 8 + Math.floorMod(current.id(), 13)));
-                else if (reward == 1) pickups.add(new Pickup(Pickup.Type.HEALTH, x, y, 2));
-                else if (reward == 2) pickups.add(new Pickup(Pickup.Type.PHASE_FRAGMENT, x, y, 2));
-                else pickups.add(new Pickup(Pickup.Type.EQUIPMENT, x, y,
-                        Math.floorMod((int) (dungeonSeed + current.id()), EquipmentType.values().length)));
-            }
-            return;
-        }
-        for (int i = 0; i < pickups.size(); i++) {
-            Pickup p = pickups.get(i);
-            if (Math.hypot(p.x() - player.getX(), p.y() - player.getY()) > 80) continue;
-            if (p.type() == Pickup.Type.COIN) coins += p.amount();
-            else if (p.type() == Pickup.Type.PHASE_FRAGMENT) player.restorePhaseEnergy(GameConfig.PHASE_ENERGY_PER_FRAGMENT * Math.max(1, p.amount()));
-            else if (p.type() == Pickup.Type.HEALTH) player.restoreHealth(Math.max(1, p.amount()));
-            else if (p.type() == Pickup.Type.ITEM) player.addItem(ItemType.values()[Math.floorMod(p.amount(), ItemType.values().length)]);
-            else if (p.type() == Pickup.Type.EQUIPMENT) {
-                if (current.type() == RoomType.SHOP && coins < 3) return;
-                if (current.type() == RoomType.SHOP) coins -= 3;
-                player.equip(EquipmentType.values()[Math.floorMod(p.amount(), EquipmentType.values().length)]);
-            }
-            pickups.remove(i);
-            return;
-        }
+
+    /** 商店商品的售价（金币）；当前房间不是商店或物品不可售时返回 -1。 */
+    public int getShopPrice(Pickup pickup) {
+        return navigation.getCurrentRoom().type() == RoomType.SHOP
+                ? RoomContentSystem.priceOf(pickup) : -1;
     }
-    private double currentRoomCenterX() {
-        Room room = navigation.getCurrentRoom();
-        return (room.minX() + room.maxX()) / 2.0;
-    }
-    private double currentRoomCenterY() {
-        Room room = navigation.getCurrentRoom();
-        return (room.minY() + room.maxY()) / 2.0;
+
+    /** 该商品是否已被选中、正等待二次确认（渲染层用它高亮）。 */
+    public boolean isShopOfferSelected(Pickup pickup) { return roomContent.isOfferSelected(pickup); }
+
+    /** 金币是否够买这件商品。 */
+    public boolean canAfford(Pickup pickup) { return RoomContentSystem.canAfford(player, pickup); }
+
+    private void interact(Room current) {
+        RoomContentSystem.Outcome outcome = roomContent.interact(current, player);
+        if (outcome == RoomContentSystem.Outcome.EVENT_AMBUSH) {
+            // 事件房抽到伏击：房间里重新刷怪并重新关门，清空后宝箱照常出现。
+            current.setCleared(false);
+            enemies.spawnEventEnemies(current, dungeonSeed, player, navigation);
+        }
     }
 
     private static String roomTypeLabel(RoomType type) {

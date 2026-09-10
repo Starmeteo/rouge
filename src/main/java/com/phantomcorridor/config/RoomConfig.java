@@ -27,6 +27,19 @@ public final class RoomConfig {
     public static final double DOOR_HALF_WIDTH = 74.0;
     public static final double SHIFT_ESCAPE_SEARCH_RADIUS = 180.0;
 
+    /** 宝箱相对房间北侧墙面的距离（像素）：渲染与交互判定共用，避免画在一处、判定在另一处。 */
+    public static final double CHEST_OFFSET_Y = 76.0;
+
+    /** 房间距离场（{@code RoomFlowField}）的格子边长（像素）：敌人用它绕开障碍接近玩家。 */
+    public static final double NAV_CELL_SIZE = 40.0;
+
+    /**
+     * 商店房距离入口节点至少要隔几个房间。
+     *
+     * <p>开局第一间就是商店时玩家既没金币也没得选，所以入口附近只生成战斗/奖励/事件房。
+     */
+    public static final int SHOP_MIN_DEPTH = 3;
+
     // ---- 房间类型默认生成权重（第 5 天接入；权重越大越易生成） ----
     /** 入口房间权重（每层固定 1 个，权重仅供占位） */
     public static final double WEIGHT_ENTRANCE = 1.0;

@@ -16,6 +16,7 @@ public final class GameController {
     private final GameLoop loop;
     private boolean running;
     private boolean shiftHeld;
+    private boolean interactHeld;
     private boolean attackHeld;
     private double aimX;
     private double aimY;
@@ -52,6 +53,7 @@ public final class GameController {
         session.newRun(settings.getDevSeed());
         input.clear();
         shiftHeld = false;
+        interactHeld = false;
         attackHeld = false;
         aimX = session.getPlayer().getX() + 1.0;
         aimY = session.getPlayer().getY();
@@ -72,6 +74,7 @@ public final class GameController {
         }
         input.clear();
         shiftHeld = false;
+        interactHeld = false;
         attackHeld = false;
     }
 
@@ -92,7 +95,11 @@ public final class GameController {
                 }
                 shiftHeld = true;
             }
-            case E -> session.requestInteract();
+            case E -> {
+                // 长按会连发 keyPressed：交互（尤其商店的二次确认）必须一次按下只算一次。
+                if (!interactHeld) session.requestInteract();
+                interactHeld = true;
+            }
             case ESCAPE, P -> onPauseRequested.run();
             default -> { }
         }
@@ -105,6 +112,7 @@ public final class GameController {
             case A, LEFT -> input.setLeft(false);
             case D, RIGHT -> input.setRight(false);
             case TAB -> shiftHeld = false;
+            case E -> interactHeld = false;
             default -> { }
         }
     }
