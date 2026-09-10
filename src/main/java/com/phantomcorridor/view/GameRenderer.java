@@ -315,6 +315,12 @@ public final class GameRenderer {
     private void drawDeathOverlay(GraphicsContext g, GameSession session) {
         g.setFill(Color.rgb(8, 4, 12, 0.78));
         g.fillRect(0, 0, AppConfig.VIEW_WIDTH, AppConfig.VIEW_HEIGHT);
+        double centerX = AppConfig.VIEW_WIDTH / 2.0;
+        double centerY = AppConfig.VIEW_HEIGHT / 2.0;
+        g.setFill(Color.rgb(18, 12, 28, .97));
+        g.fillRoundRect(centerX - 300, centerY - 160, 600, 330, 24, 24);
+        g.setStroke(Color.web("#a878c7")); g.setLineWidth(2.0);
+        g.strokeRoundRect(centerX - 300, centerY - 160, 600, 330, 24, 24);
         g.setTextAlign(TextAlignment.CENTER);
         g.setFill(Color.web("#f0d7e8"));
         g.setFont(Font.font("Microsoft YaHei UI", FontWeight.BOLD, 42));
@@ -322,9 +328,23 @@ public final class GameRenderer {
         g.setFont(Font.font("Microsoft YaHei UI", 18));
         g.setFill(Color.web("#c9b4ca"));
         g.fillText("本次探索结束 · 金币 " + session.getCoins(), AppConfig.VIEW_WIDTH / 2.0, AppConfig.VIEW_HEIGHT / 2.0 + 18);
-        g.setFont(Font.font("Microsoft YaHei UI", 16));
-        g.fillText("[R] 重新开始        [M] 返回主菜单", AppConfig.VIEW_WIDTH / 2.0, AppConfig.VIEW_HEIGHT / 2.0 + 62);
+        drawDeathButton(g, session, centerX - 170, centerY + 44, 140, 50, "重新开始", false);
+        drawDeathButton(g, session, centerX + 30, centerY + 44, 140, 50, "返回主菜单", true);
         g.setTextAlign(TextAlignment.LEFT);
+    }
+
+    private void drawDeathButton(GraphicsContext g, GameSession session, double x, double y,
+                                 double width, double height, String label, boolean menu) {
+        boolean hover = session.getAimX() >= x && session.getAimX() <= x + width
+                && session.getAimY() >= y && session.getAimY() <= y + height;
+        g.setFill(Color.rgb(0, 0, 0, .35)); g.fillRoundRect(x + 4, y + 5, width, height, 10, 10);
+        Color base = menu ? Color.web("#6b4a92") : Color.web("#9a5d72");
+        g.setFill(hover ? base.brighter() : base);
+        g.fillRoundRect(x, y - (hover ? 2 : 0), width, height, 10, 10);
+        g.setStroke(hover ? Color.web("#fff0bd") : Color.web("#dcb8e5")); g.setLineWidth(2.0);
+        g.strokeRoundRect(x, y - (hover ? 2 : 0), width, height, 10, 10);
+        g.setFill(Color.web("#fff6e8")); g.setFont(Font.font("Microsoft YaHei UI", FontWeight.BOLD, 16));
+        g.fillText(label, x + width / 2.0, y + 31 - (hover ? 2 : 0));
     }
 
     /** 商店商品的价格牌：买得起显示金色，买不起显示灰红色并写明状态。 */

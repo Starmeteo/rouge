@@ -4,6 +4,7 @@ import com.phantomcorridor.core.GameLoop;
 import com.phantomcorridor.model.GameSession;
 import com.phantomcorridor.view.GameView;
 import javafx.scene.input.KeyCode;
+import com.phantomcorridor.config.AppConfig;
 import com.phantomcorridor.config.Settings;
 
 /** 游戏输入、模型更新和渲染调度。 */
@@ -45,6 +46,7 @@ public final class GameController {
         };
         view.bindInput(this::keyPressed, this::keyReleased);
         view.bindPointer(this::pointerMoved, held -> attackHeld = held);
+        view.bindClick(this::pointerClicked);
         view.bindLifecycle(this::start, this::stop);
         session.newRun(settings.getDevSeed());
     }
@@ -80,8 +82,6 @@ public final class GameController {
 
     private void keyPressed(KeyCode key) {
         if (session.getPlayer().getHp() <= 0) {
-            if (key == KeyCode.R) newRun();
-            else if (key == KeyCode.M) onMainMenu.run();
             return;
         }
         switch (key) {
@@ -120,5 +120,18 @@ public final class GameController {
     private void pointerMoved(double x, double y) {
         aimX = x;
         aimY = y;
+    }
+
+    private void pointerClicked(double x, double y) {
+        if (session.getPlayer().getHp() > 0) return;
+        double centerX = AppConfig.VIEW_WIDTH / 2.0;
+        double centerY = AppConfig.VIEW_HEIGHT / 2.0;
+        double buttonY = centerY + 44.0;
+        if (y < buttonY || y > buttonY + 50.0) return;
+        if (x >= centerX - 170.0 && x <= centerX - 30.0) {
+            newRun();
+        } else if (x >= centerX + 30.0 && x <= centerX + 170.0) {
+            onMainMenu.run();
+        }
     }
 }

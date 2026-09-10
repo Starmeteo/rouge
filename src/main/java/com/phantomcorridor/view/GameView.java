@@ -29,6 +29,7 @@ public final class GameView extends StackPane implements SceneLifecycle {
     private Consumer<KeyCode> keyPressed = key -> { };
     private Consumer<KeyCode> keyReleased = key -> { };
     private BiConsumer<Double, Double> pointerMoved = (x, y) -> { };
+    private BiConsumer<Double, Double> clicked = (x, y) -> { };
     private Consumer<Boolean> attackChanged = attacking -> { };
     private Runnable enterAction = () -> { };
     private Runnable exitAction = () -> { };
@@ -59,8 +60,11 @@ public final class GameView extends StackPane implements SceneLifecycle {
         setOnMouseDragged(event -> pointerMoved.accept(logicalX(event.getX()), logicalY(event.getY())));
         setOnMousePressed(event -> {
             requestFocus();
-            pointerMoved.accept(logicalX(event.getX()), logicalY(event.getY()));
+            double lx = logicalX(event.getX());
+            double ly = logicalY(event.getY());
+            pointerMoved.accept(lx, ly);
             if (event.getButton() == MouseButton.PRIMARY) {
+                clicked.accept(lx, ly);
                 attackChanged.accept(true);
             }
         });
@@ -80,6 +84,10 @@ public final class GameView extends StackPane implements SceneLifecycle {
     public void bindPointer(BiConsumer<Double, Double> onMoved, Consumer<Boolean> onAttackChanged) {
         pointerMoved = onMoved;
         attackChanged = onAttackChanged;
+    }
+
+    public void bindClick(BiConsumer<Double, Double> onClick) {
+        clicked = onClick;
     }
 
     public void bindLifecycle(Runnable onEnter, Runnable onExit) {
