@@ -31,6 +31,10 @@ public final class Player {
     private double dashDirectionX;
     private double dashDirectionY;
     private final List<DashTrailPoint> dashTrail = new ArrayList<>();
+    private double hitFlashRemaining;
+    private boolean hitKnockbackPending;
+    private double hitKnockbackX;
+    private double hitKnockbackY;
     private final List<ItemType> items = new ArrayList<>();
     private final List<EquipmentType> equipment = new ArrayList<>();
 
@@ -58,6 +62,10 @@ public final class Player {
         this.dashDirectionX = 1.0;
         this.dashDirectionY = 0.0;
         this.dashTrail.clear();
+        this.hitFlashRemaining = 0.0;
+        this.hitKnockbackPending = false;
+        this.hitKnockbackX = 0.0;
+        this.hitKnockbackY = 0.0;
         this.items.clear();
         this.equipment.clear();
     }
@@ -203,6 +211,7 @@ public final class Player {
     public void updateAnimation(double dt, double movementX, double movementY, boolean attacking,
                                 boolean shifting) {
         hitInvulnerability = Math.max(0.0, hitInvulnerability - Math.max(0.0, dt));
+        hitFlashRemaining = Math.max(0.0, hitFlashRemaining - Math.max(0.0, dt));
         animationTime += Math.max(0.0, dt);
         // 冲刺中朝向锁在冲刺方向上：拖尾与角色朝向必须一致，否则拖尾会"横着飘"。
         double lookX = isDashing() ? dashDirectionX : movementX;
@@ -227,20 +236,70 @@ public final class Player {
         this.y = y;
     }
 
+    /** 受到伤害且不知道伤害来源：击退方向按角色朝向的反方向算。 */
+    public boolean takeDamage(int damage) {
+        return takeDamage(damage, Double.NaN, Double.NaN);
+    }
+
     /**
-     * 受到伤害。
+     * 受到伤害：扣血、进入短暂无敌、贴图变淡，并按来源反方向登记一次击退。
      *
      * <p>两条免伤路径：受击后的短暂无敌时间（避免一帧内被重叠弹幕重复扣血），
-     * 以及冲刺全程的无敌（闪避的位移必须配得上"躲开"这个词）。
+     * 以及冲刺全程的无敌（闪避的位移必须配得上"躲开"这个词）。免疫时不产生任何受击反应。
      *
+     * <p>击退只在这里登记方向，实际位移由 {@link #consumeKnockback()} 交给房间导航执行——
+     * 角色模型不知道墙在哪，硬改坐标会把人塞进墙里。
+     *
+     * @param damage  伤害值
+     * @param sourceX 伤害来源的横坐标；未知时传 {@link Double#NaN}
+     * @param sourceY 伤害来源的纵坐标；未知时传 {@link Double#NaN}
      * @return 是否真的掉血；免疫时返回 {@code false}
      */
-    public boolean takeDamage(int damage) {
+    public boolean takeDamage(int damage, double sourceX, double sourceY) {
         // 冲刺全程免伤：闪避就是"用无敌帧换位移"，否则这段位移只是跑得快一点。
         if (damage <= 0 || isDashing() || hitInvulnerability > 0.0 || hp <= 0) return false;
         hp = Math.max(0, hp - damage);
         hitInvulnerability = GameConfig.PLAYER_HIT_INVULNERABILITY;
+        hitFlashRemaining = GameConfig.PLAYER_HIT_FLASH_TIME;
+        beginHitKnockback(sourceX, sourceY);
         return true;
+    }
+
+    /** 把击退方向定成"从伤害来源指向角色"；来源未知或正好压在角色身上时退化为朝向的反方向。 */
+    private void beginHitKnockback(double sourceX, double sourceY) {
+        double dx = x - sourceX;
+        double dy = y - sourceY;
+        double length = Math.hypot(dx, dy);
+        if (length > 0.0) {
+            hitKnockbackX = dx / length;
+            hitKnockbackY = dy / length;
+        } else {
+            hitKnockbackX = -facingX;
+            hitKnockbackY = -facingY;
+        }
+        hitKnockbackPending = true;
+    }
+
+    /**
+     * 取出并清除这次受击的击退方向（单位向量）。
+     *
+     * @return 击退方向；这一帧没有待处理的击退时返回 {@code null}
+     */
+    public double[] consumeKnockback() {
+        if (!hitKnockbackPending) return null;
+        hitKnockbackPending = false;
+        return new double[]{hitKnockbackX, hitKnockbackY};
+    }
+
+    /**
+     * 受击变淡的剩余强度（0~1，1 表示刚挨打）。
+     *
+     * <p>渲染层据此把角色贴图往白色虚化一档：这是"挨了一下"的即时反馈，
+     * 和无敌时间分开计时，所以变淡会比无敌更早消失。
+     */
+    public double getHitFlash() {
+        return GameConfig.PLAYER_HIT_FLASH_TIME <= 0.0 ? 0.0
+                : Math.max(0.0, hitFlashRemaining) / GameConfig.PLAYER_HIT_FLASH_TIME;
     }
 
     public int getHp() { return hp; }

@@ -238,7 +238,29 @@ public final class GameConfig {
     public static final double ENEMY_PROJECTILE_LIFETIME = ENEMY_RANGED_ATTACK_RANGE * 1.3 / ENEMY_PROJECTILE_SPEED;
 
     public static final double ENEMY_PROJECTILE_RADIUS = 12.0;
+
+    // ---- 玩家受击反应 ----
+    /**
+     * 受击后的无敌时间（秒）。
+     *
+     * <p>这段时间避免一帧内被重叠弹幕重复扣血；同时不许往回走太多，
+     * 否则"贴着打"会变成完全打不中。
+     */
     public static final double PLAYER_HIT_INVULNERABILITY = 0.65;
+
+    /** 受击击退距离（像素）：沿伤害来源的反方向被推开。 */
+    public static final double PLAYER_HIT_KNOCKBACK = 25.0;
+
+    /** 受击贴图变淡的持续时间（秒）：比无敌时间短，是"挨了一下"的即时反馈。 */
+    public static final double PLAYER_HIT_FLASH_TIME = 0.25;
+
+    /**
+     * 受击变淡的最大强度（0~1）：越大越接近被打白。
+     *
+     * <p>渲染层会按这个强度叠两遍 SCREEN，所以 0.9 已经能把角色洗到接近白色——
+     * 再高一点就只剩轮廓，看不出是哪只角色、朝哪边了。
+     */
+    public static final double PLAYER_HIT_FLASH_STRENGTH = 0.9;
 
     // ---- 玩家生命 ----
     /** 玩家最大生命值（需求未对双界版给出明确数值，沿用旧版 3 点作为占位，待 §7.2 道具加成时校调） */

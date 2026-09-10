@@ -137,6 +137,7 @@ public final class GameSession {
         roomContent.update(navigation.getCurrentRoom(), player);
         attackSystem.update(dt, navigation);
         enemies.update(dt, player, attackSystem, navigation);
+        applyHitKnockback();
         // 首领起手召唤时给一条即时提示：裂隙本身画在地上，但玩家常常正盯着首领看。
         if (enemies.consumeSummonCalls() > 0) {
             roomAnnouncement = "守望者撕开裂隙 · 召唤增援";
@@ -208,6 +209,18 @@ public final class GameSession {
      * 输入层不该知道冲刺规则，也不该绕过冷却。
      */
     public void requestDash() { dashRequested = true; }
+
+    /**
+     * 结算这一帧登记下来的受击击退。
+     *
+     * <p>放在敌人系统之后：伤害是在那里判定的，击退必须和扣血同一帧生效，
+     * 否则玩家会看到"先掉血、下一帧才被推开"的脱节感。
+     */
+    private void applyHitKnockback() {
+        double[] direction = player.consumeKnockback();
+        if (direction == null) return;
+        navigation.knockback(player, direction[0], direction[1], GameConfig.PLAYER_HIT_KNOCKBACK);
+    }
 
     /** 当前层数（从 1 开始）。 */
     public int getFloor() { return floor; }

@@ -25,6 +25,9 @@ import com.phantomcorridor.model.room.RoomArea;
 import com.phantomcorridor.model.room.Wall;
 import javafx.scene.canvas.GraphicsContext;
 import javafx.scene.image.Image;
+import javafx.scene.image.PixelReader;
+import javafx.scene.image.PixelWriter;
+import javafx.scene.image.WritableImage;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
@@ -66,6 +69,8 @@ public final class GameRenderer {
     private static final Image REWARD_ICONS = loadUiImage("reward_icons_v1.png");
     private static final Image WEAPON_ICONS = loadUiImage("weapons_v1.png");
     private static final Image EQUIPMENT_ICONS = loadUiImage("equipment_v1.png");
+    /** 受击闪白用的"纯白剪影"缓存：按需生成，同一张贴图只算一次。 */
+    private static final Map<Image, Image> WHITE_SILHOUETTES = new HashMap<>();
     private static final Map<String, Image> MONSTER_IMAGES = new HashMap<>();
     private static final Map<String, Image[]> MONSTER_FRAME_SETS = new HashMap<>();
 
@@ -952,10 +957,14 @@ public final class GameRenderer {
         double y = Math.rint(player.getY());
         PlayerAnimationState state = player.getAnimationState();
         int frame = (int) (player.getAnimationTime() * 8) & 1;
+        // 矢量兜底造型没有贴图可叠加，直接用半透明表现"变淡"。
+        double flash = player.getHitFlash();
+        if (flash > 0.0) g.setGlobalAlpha(1.0 - 0.75 * GameConfig.PLAYER_HIT_FLASH_STRENGTH * flash);
         if (state == PlayerAnimationState.DOWN) {
             g.setFill(Color.web("#17131d")); g.fillRect(x - 19, y + 4, 38, 10);
             g.setFill(domain); g.fillRect(x - 15, y, 24, 8);
             g.setFill(light ? Color.web("#f4e5bd") : Color.web("#cbb0e8")); g.fillRect(x + 9, y + 2, 9, 9);
+            g.setGlobalAlpha(1.0);
             return;
         }
         // 矢量兜底造型也要认得冲刺：把它当成更快的移动，而不是站着不动。
@@ -980,6 +989,7 @@ public final class GameRenderer {
             g.setFill(light ? Color.web("#fff2a3") : Color.web("#d398ff"));
             g.fillRect(x + fx * 14 - (fx < 0 ? 12 : 0), y - 3, 12, 7);
         }
+        g.setGlobalAlpha(1.0);
     }
 
     private void drawSpritePlayer(GraphicsContext g, Player player, boolean light) {
@@ -1007,6 +1017,44 @@ public final class GameRenderer {
         // v2 资源的视觉锚点落在胸口附近，而不是画布顶部或脚底。
         double top = Math.rint(player.getY() - drawH * 0.58);
         g.drawImage(sprite, mirror ? left + drawW : left, top, mirror ? -drawW : drawW, drawH);
+        drawHitFlash(g, player, sprite, left, top, drawW, drawH, mirror);
+    }
+
+    /**
+     * 受击变淡：在角色贴图上叠一层预先生成的"纯白剪影"，颜色被洗白，强度随受击剩余时间衰减。
+     *
+     * <p>这里刻意**不用 SCREEN / ADD 之类的混合模式**：窗口尺寸与逻辑分辨率不一致时，渲染前会
+     * 对整个画布做缩放，而混合模式要求渲染管线读回目标像素；部分管线在这种情况下会把混合结果
+     * 当整块区域重新合成，于是角色周围（以及画面中对比强的边缘）会出现一大片发暗、发黑的方块。
+     * 换成"白剪影 + 普通 alpha 混合"之后，效果和缩放比例完全无关，任何管线都稳定。
+     *
+     * <p>剪影保留原贴图的 alpha，所以只覆盖角色自己占的像素：地板、敌人和拖尾都不受影响。
+     */
+    private void drawHitFlash(GraphicsContext g, Player player, Image sprite,
+                              double left, double top, double drawW, double drawH, boolean mirror) {
+        double flash = player.getHitFlash();
+        if (flash <= 0.01) return;
+        g.setGlobalAlpha(GameConfig.PLAYER_HIT_FLASH_STRENGTH * flash);
+        Image silhouette = whiteSilhouette(sprite);
+        g.drawImage(silhouette, mirror ? left + drawW : left, top, mirror ? -drawW : drawW, drawH);
+        g.setGlobalAlpha(1.0);
+    }
+
+    /** 生成一张保留 alpha、颜色全白的贴图副本；同一张原图只生成一次，之后走缓存。 */
+    private static Image whiteSilhouette(Image source) {
+        return WHITE_SILHOUETTES.computeIfAbsent(source, image -> {
+            int width = (int) image.getWidth();
+            int height = (int) image.getHeight();
+            WritableImage silhouette = new WritableImage(width, height);
+            PixelReader reader = image.getPixelReader();
+            PixelWriter writer = silhouette.getPixelWriter();
+            for (int y = 0; y < height; y++) {
+                for (int x = 0; x < width; x++) {
+                    writer.setArgb(x, y, (reader.getArgb(x, y) & 0xff000000) | 0x00ffffff);
+                }
+            }
+            return silhouette;
+        });
     }
 
     /**

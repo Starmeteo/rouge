@@ -810,7 +810,8 @@ public final class EnemySystem {
             if (!attack.isExpired() && attack.getWorld() == player.getCurrentWorld()
                     && CollisionUtil.circleIntersectsCircle(attack.getX(), attack.getY(), attack.getRadius(),
                     player.getX(), player.getY(), GameConfig.PLAYER_RADIUS)) {
-                player.takeDamage(1);
+                // 带上攻击落点：玩家受击要沿"从这一击指回角色"的方向被推开。
+                player.takeDamage(1, attack.getX(), attack.getY());
                 attack.expire();
             }
             if (attack.isExpired() && attack.consumeImpact()) {
