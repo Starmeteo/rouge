@@ -45,7 +45,8 @@ import javafx.scene.text.TextAlignment;
 public final class GameRenderer {
 
     /** 小地图：面板边长与每格房间的像素间距（间距要够大，房间之间才看得出连接关系）。 */
-    private static final double MINI_MAP_PANEL_SIZE = 280.0;
+    // 原 280px 面板在战斗外也会过度抢占画面；缩至约 2/3，仍能保留中心跟随与裁剪效果。
+    private static final double MINI_MAP_PANEL_SIZE = 187.0;
     private static final double MINI_MAP_SCALE = 27.0;
 
     private static final Color LIGHT_GOLD = Color.web("#e8bd68");

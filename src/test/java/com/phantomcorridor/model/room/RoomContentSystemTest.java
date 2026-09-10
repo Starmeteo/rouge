@@ -220,6 +220,22 @@ class RoomContentSystemTest {
     }
 
     @Test
+    void rewardRoomContentsStayCenteredInsteadOfFollowingTheEntryPosition() {
+        Room room = openRoom(12, RoomType.REWARD);
+        Player player = new Player(120, 180);
+        RoomContentSystem content = new RoomContentSystem();
+        content.reset(42L, 1);
+
+        content.enterRoom(room, player);
+
+        assertEquals(2, room.loot().pickups().size());
+        double averageX = room.loot().pickups().stream().mapToDouble(Pickup::x).average().orElseThrow();
+        double averageY = room.loot().pickups().stream().mapToDouble(Pickup::y).average().orElseThrow();
+        assertEquals((room.minX() + room.maxX()) / 2.0, averageX);
+        assertEquals((room.minY() + room.maxY()) / 2.0, averageY);
+    }
+
+    @Test
     void shopPromptShowsTheItemNameAndPrice() {
         Room shop = openRoom(3, RoomType.SHOP);
         Player player = new Player(640, 480);
