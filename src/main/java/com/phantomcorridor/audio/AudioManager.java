@@ -89,7 +89,6 @@ public final class AudioManager {
         double targetVolume = settings.getMusicVolume();
         next.setVolume(0.0);
         next.setCycleCount(MediaPlayer.INDEFINITE);
-        next.play();
 
         if (previous == null) {
             transition = new Timeline(new KeyFrame(Duration.ZERO, new KeyValue(next.volumeProperty(), 0.0)),
@@ -116,8 +115,14 @@ public final class AudioManager {
         }
         try {
             MediaPlayer result = new MediaPlayer(new Media(resource.toExternalForm()));
-            // 编解码器或文件异常不能拖垮游戏循环；禁用该曲目后仍可继续运行其他系统。
-            result.setOnError(() -> unavailable.add(track));
+            // JavaFX 媒体在资源尚未 ready 时直接 play 在部分 Windows 环境会被丢弃，
+            // 改为在 READY 回调启动；同时保留错误状态，便于下次切换时重试而不拖垮主循环。
+            result.setOnReady(result::play);
+            result.setOnError(() -> {
+                if (result.getError() != null) {
+                    System.err.println("BGM 加载失败（" + track + "）: " + result.getError().getMessage());
+                }
+            });
             return result;
         } catch (RuntimeException exception) {
             unavailable.add(track);

@@ -77,6 +77,7 @@ public final class GameRenderer {
     private static final Image REWARD_ICONS = loadUiImage("reward_icons_v1.png");
     private static final Image WEAPON_ICONS = loadUiImage("weapons_v1.png");
     private static final Image EQUIPMENT_ICONS = loadUiImage("equipment_v1.png");
+    private static final Map<String, Image> EQUIPMENT_ASSETS = loadEquipmentAssets();
     private static final Map<String, Image> MONSTER_IMAGES = new HashMap<>();
     private static final Map<String, Image[]> MONSTER_FRAME_SETS = new HashMap<>();
 
@@ -719,28 +720,22 @@ public final class GameRenderer {
         g.setStroke(Color.rgb(255, 255, 255, 0.28));
         g.strokeRoundRect(x, y, width, height, 7, 7);
 
-        // 护盾条：画在血条下沿内侧，长度按“换算到生命刻度”的比例，且不超出已填充的血条范围。
+        // 护盾条追加在血条右侧，使用灰白色，避免与生命填充混在一起。
         if (player.getMaxShield() > 0.0) {
-            double shieldLength = Math.min(width * player.getShieldBarRatio(), filled);
+            double shieldLength = Math.min(width * player.getShieldBarRatio(), width);
             if (shieldLength > 0.5) {
-                double barY = y + height - GameConfig.HUD_SHIELD_BAR_HEIGHT - 1.0;
-                g.setFill(Color.color(SHIELD_BLUE.getRed(), SHIELD_BLUE.getGreen(), SHIELD_BLUE.getBlue(), 0.92));
-                g.fillRoundRect(x + 1, barY, shieldLength, GameConfig.HUD_SHIELD_BAR_HEIGHT, 3, 3);
-                g.setStroke(Color.web("#e8f8ff"));
+                double shieldX = x + width + 6.0;
+                g.setFill(Color.rgb(218, 224, 232, 0.92));
+                g.fillRoundRect(shieldX, y, shieldLength, height, 7, 7);
+                g.setStroke(Color.web("#ffffff"));
                 g.setLineWidth(1.0);
-                g.strokeRoundRect(x + 1, barY, shieldLength, GameConfig.HUD_SHIELD_BAR_HEIGHT, 3, 3);
+                g.strokeRoundRect(shieldX, y, shieldLength, height, 7, 7);
             }
         }
 
         g.setFill(Color.web("#ffe9ec"));
         g.setFont(Font.font("Consolas", FontWeight.BOLD, 13));
         g.fillText(player.getHp() + " / " + player.maxHp(), x + 7, y + height - 4.0);
-        // 护盾点数写在血条右侧；血量本身占满整条时右端没有空位，这种情况下
-        // 就不写数字——下沿那条护盾条本身已经说明了剩余量，不必压着血量文字画。
-        if (player.hasShield() && filled < width - 34.0) {
-            g.setFill(SHIELD_BLUE);
-            g.fillText("◆ " + formatPoints(player.getShield()), x + width + 12, y + height - 4.0);
-        }
     }
 
     /** 伤害点数文本：整数不拖小数点，半整数（4.5）才显一位小数。 */
@@ -791,10 +786,12 @@ public final class GameRenderer {
         g.fillText("攻击 1 + " + (player.getAttackDamage() - 1) + "  ·  已装备属性实时生效", 70, 306);
         int index = 0;
         for (var item : player.getEquipment()) {
+            Image dedicated = item.assetId() == null ? null : EQUIPMENT_ASSETS.get(item.assetId());
             Image source = item.iconIndex() < 3 ? WEAPON_ICONS : EQUIPMENT_ICONS;
             int local = item.iconIndex() % 3;
             double x = 110 + index * 52;
-            if (source != null) g.drawImage(source, local * source.getWidth() / 3.0, 0,
+            if (dedicated != null) g.drawImage(dedicated, 0, 0, dedicated.getWidth(), dedicated.getHeight(), x, 255, 42, 42);
+            else if (source != null) g.drawImage(source, local * source.getWidth() / 3.0, 0,
                     source.getWidth() / 3.0, source.getHeight(), x, 255, 42, 42);
             if (Math.hypot(session.getAimX() - (x + 21), session.getAimY() - 276) < 26) {
                 g.setFill(Color.rgb(10, 8, 16, .94)); g.fillRoundRect(x, 300, 220, 38, 7, 7);
@@ -1153,7 +1150,8 @@ public final class GameRenderer {
         g.setTextAlign(TextAlignment.CENTER);
         g.setFont(Font.font("Consolas", FontWeight.BOLD, 24));
         g.setFill(Color.rgb(255, 239, 178, alpha));
-        g.fillText("◆  " + session.getRoomAnnouncement() + "  ◆", AppConfig.VIEW_WIDTH / 2.0, 84);
+        double announcementY = session.isFloorAnnouncement() ? AppConfig.VIEW_HEIGHT / 2.0 : 84.0;
+        g.fillText("◆  " + session.getRoomAnnouncement() + "  ◆", AppConfig.VIEW_WIDTH / 2.0, announcementY);
         g.setTextAlign(TextAlignment.LEFT);
     }
 
@@ -1183,6 +1181,16 @@ public final class GameRenderer {
         return resource == null ? null : new Image(resource.toExternalForm(), false);
     }
 
+    private static Map<String, Image> loadEquipmentAssets() {
+        Map<String, Image> result = new HashMap<>();
+        for (var item : com.phantomcorridor.model.EquipmentType.values()) {
+            if (item.assetId() == null) continue;
+            Image image = loadUiImage("equipment/" + item.assetId() + ".png");
+            if (image != null) result.put(item.assetId(), image);
+        }
+        return result;
+    }
+
     private void drawHud(GraphicsContext g, GameSession session, double fps, boolean light) {
         Color domain = light ? LIGHT_GOLD : SHADOW_VIOLET;
         Player player = session.getPlayer();
@@ -1197,12 +1205,6 @@ public final class GameRenderer {
         g.setFill(Color.web("#efe7d8"));
         g.fillText("生命", 78, 91);
         drawHealthBar(g, player);
-        // 层数与难度放在第一行右侧：并进下面那行状态文字会顶出面板。
-        g.setFill(domain);
-        g.setFont(Font.font("Microsoft YaHei UI", FontWeight.BOLD, 15));
-        g.fillText("第 " + session.getFloor() + " / " + session.getTotalFloors() + " 层　·　"
-                + session.getDifficulty().displayName() + "（敌人 " + session.getDifficulty().percentText() + "）",
-                286, 91);
         g.setFont(Font.font("Microsoft YaHei UI", FontWeight.BOLD, 17));
 
         g.setFill(Color.rgb(111, 177, 255, 0.9));
