@@ -9,6 +9,7 @@ import com.phantomcorridor.model.RoomType;
 import com.phantomcorridor.model.WorldType;
 import com.phantomcorridor.model.entity.Player;
 import com.phantomcorridor.model.entity.PlayerAnimationState;
+import com.phantomcorridor.model.entity.DashTrailPoint;
 import com.phantomcorridor.model.combat.Projectile;
 import com.phantomcorridor.model.combat.EnemyAttack;
 import com.phantomcorridor.model.combat.EnemyVisualEffect;
@@ -25,6 +26,9 @@ import com.phantomcorridor.model.room.RoomArea;
 import com.phantomcorridor.model.room.Wall;
 import javafx.scene.canvas.GraphicsContext;
 import javafx.scene.image.Image;
+import javafx.scene.image.PixelReader;
+import javafx.scene.image.PixelWriter;
+import javafx.scene.image.WritableImage;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
@@ -77,6 +81,8 @@ public final class GameRenderer {
     private static final Image REWARD_ICONS = loadUiImage("reward_icons_v1.png");
     private static final Image WEAPON_ICONS = loadUiImage("weapons_v1.png");
     private static final Image EQUIPMENT_ICONS = loadUiImage("equipment_v1.png");
+    /** 受击闪白用的"纯白剪影"缓存：按需生成，同一张贴图只算一次。 */
+    private static final Map<Image, Image> WHITE_SILHOUETTES = new HashMap<>();
     private static final Map<String, Image> EQUIPMENT_ASSETS = loadEquipmentAssets();
     private static final Map<String, Image> MONSTER_IMAGES = new HashMap<>();
     private static final Map<String, Image[]> MONSTER_FRAME_SETS = new HashMap<>();
@@ -95,6 +101,8 @@ public final class GameRenderer {
         drawPortal(g, session);
         drawPickups(g, session);
         drawInteractionPrompt(g, session);
+        // 拖尾垫在角色之下：残影只该在身后露出来，不能糊在自己脸上。
+        drawDashTrail(g, player, light);
         drawPlayer(g, player, light);
         // 攻击层在角色之后绘制，避免角色把斩击和投射物遮住。
         drawAttacks(g, session, light);
@@ -736,6 +744,12 @@ public final class GameRenderer {
         g.setFill(Color.web("#ffe9ec"));
         g.setFont(Font.font("Consolas", FontWeight.BOLD, 13));
         g.fillText(player.getHp() + " / " + player.maxHp(), x + 7, y + height - 4.0);
+        // 护盾点数写在血条右侧；血量本身占满整条时右端没有空位，这种情况下
+        // 就不写数字——下沿那条护盾条本身已经说明了剩余量，不必压着血量文字画。
+        if (player.hasShield() && filled < width - 34.0) {
+            g.setFill(SHIELD_BLUE);
+            g.fillText("◆ " + formatPoints(player.getShield()), x + width + 12, y + height - 4.0);
+        }
     }
 
     /** 伤害点数文本：整数不拖小数点，半整数（4.5）才显一位小数。 */
@@ -786,12 +800,10 @@ public final class GameRenderer {
         g.fillText("攻击 1 + " + (player.getAttackDamage() - 1) + "  ·  已装备属性实时生效", 70, 306);
         int index = 0;
         for (var item : player.getEquipment()) {
-            Image dedicated = item.assetId() == null ? null : EQUIPMENT_ASSETS.get(item.assetId());
             Image source = item.iconIndex() < 3 ? WEAPON_ICONS : EQUIPMENT_ICONS;
             int local = item.iconIndex() % 3;
             double x = 110 + index * 52;
-            if (dedicated != null) g.drawImage(dedicated, 0, 0, dedicated.getWidth(), dedicated.getHeight(), x, 255, 42, 42);
-            else if (source != null) g.drawImage(source, local * source.getWidth() / 3.0, 0,
+            if (source != null) g.drawImage(source, local * source.getWidth() / 3.0, 0,
                     source.getWidth() / 3.0, source.getHeight(), x, 255, 42, 42);
             if (Math.hypot(session.getAimX() - (x + 21), session.getAimY() - 276) < 26) {
                 g.setFill(Color.rgb(10, 8, 16, .94)); g.fillRoundRect(x, 300, 220, 38, 7, 7);
@@ -1066,13 +1078,19 @@ public final class GameRenderer {
         double y = Math.rint(player.getY());
         PlayerAnimationState state = player.getAnimationState();
         int frame = (int) (player.getAnimationTime() * 8) & 1;
+        // 矢量兜底造型没有贴图可叠加，直接用半透明表现"变淡"。
+        double flash = player.getHitFlash();
+        if (flash > 0.0) g.setGlobalAlpha(1.0 - 0.75 * GameConfig.PLAYER_HIT_FLASH_STRENGTH * flash);
         if (state == PlayerAnimationState.DOWN) {
             g.setFill(Color.web("#17131d")); g.fillRect(x - 19, y + 4, 38, 10);
             g.setFill(domain); g.fillRect(x - 15, y, 24, 8);
             g.setFill(light ? Color.web("#f4e5bd") : Color.web("#cbb0e8")); g.fillRect(x + 9, y + 2, 9, 9);
+            g.setGlobalAlpha(1.0);
             return;
         }
-        double bob = state == PlayerAnimationState.MOVING && frame == 1 ? -3 : 0;
+        // 矢量兜底造型也要认得冲刺：把它当成更快的移动，而不是站着不动。
+        boolean stepping = state == PlayerAnimationState.MOVING || state == PlayerAnimationState.DASHING;
+        double bob = stepping && frame == 1 ? -3 : 0;
         if (state == PlayerAnimationState.SHIFTING && frame == 1) {
             g.setFill(Color.rgb(255, 255, 255, 0.34)); g.fillRect(x - 24, y - 28, 48, 52);
         }
@@ -1084,7 +1102,7 @@ public final class GameRenderer {
         g.fillRect(x - 7, y - 10 + bob, 14, 12);
         g.setFill(Color.web("#18121d")); g.fillRect(x - 4, y - 6 + bob, 3, 3); g.fillRect(x + 3, y - 6 + bob, 3, 3);
         g.setFill(domain);
-        double legOffset = state == PlayerAnimationState.MOVING ? (frame == 0 ? 4 : -4) : 0;
+        double legOffset = stepping ? (frame == 0 ? 4 : -4) : 0;
         g.fillRect(x - 10 + legOffset, y + 11 + bob, 7, 10);
         g.fillRect(x + 3 - legOffset, y + 11 + bob, 7, 10);
         if (state == PlayerAnimationState.ATTACKING) {
@@ -1093,6 +1111,7 @@ public final class GameRenderer {
             g.fillRect(x + fx * 14 - (fx < 0 ? 12 : 0), y - 3, 12, 7);
         }
         drawShieldAura(g, player, light);
+        g.setGlobalAlpha(1.0);
     }
 
     /**
@@ -1118,15 +1137,15 @@ public final class GameRenderer {
 
     private void drawSpritePlayer(GraphicsContext g, Player player, boolean light) {
         Map<String, Image[]> all = light ? LIGHT_FRAMES : SHADOW_FRAMES;
-        String direction = player.getFacingY() < -0.35 ? "back" : player.getFacingY() > 0.35 ? "front"
-                : player.getFacingX() < 0 ? "left" : "right";
+        String direction = spriteDirection(player.getFacingX(), player.getFacingY());
         boolean mirror = direction.equals("left");
         String assetDirection = mirror ? "right" : direction;
         String action = switch (player.getAnimationState()) {
             case ATTACKING -> "slash_" + (assetDirection.equals("right") ? "right" : "recover_front");
             case SHIFTING -> "cast_right";
             case DOWN -> "down_" + assetDirection;
-            case MOVING -> "move_" + assetDirection;
+            // 冲刺没有专属素材，用移动帧 + 拖尾表现"带着残影窜过去"。
+            case MOVING, DASHING -> "move_" + assetDirection;
             default -> "idle_" + assetDirection;
         };
         Image[] frames = all.getOrDefault(action, all.getOrDefault("idle_front", new Image[0]));
@@ -1141,6 +1160,89 @@ public final class GameRenderer {
         // v2 资源的视觉锚点落在胸口附近，而不是画布顶部或脚底。
         double top = Math.rint(player.getY() - drawH * 0.58);
         g.drawImage(sprite, mirror ? left + drawW : left, top, mirror ? -drawW : drawW, drawH);
+        drawHitFlash(g, player, sprite, left, top, drawW, drawH, mirror);
+    }
+
+    /**
+     * 受击变淡：在角色贴图上叠一层预先生成的"纯白剪影"，颜色被洗白，强度随受击剩余时间衰减。
+     *
+     * <p>这里刻意**不用 SCREEN / ADD 之类的混合模式**：窗口尺寸与逻辑分辨率不一致时，渲染前会
+     * 对整个画布做缩放，而混合模式要求渲染管线读回目标像素；部分管线在这种情况下会把混合结果
+     * 当整块区域重新合成，于是角色周围（以及画面中对比强的边缘）会出现一大片发暗、发黑的方块。
+     * 换成"白剪影 + 普通 alpha 混合"之后，效果和缩放比例完全无关，任何管线都稳定。
+     *
+     * <p>剪影保留原贴图的 alpha，所以只覆盖角色自己占的像素：地板、敌人和拖尾都不受影响。
+     */
+    private void drawHitFlash(GraphicsContext g, Player player, Image sprite,
+                              double left, double top, double drawW, double drawH, boolean mirror) {
+        double flash = player.getHitFlash();
+        if (flash <= 0.01) return;
+        g.setGlobalAlpha(GameConfig.PLAYER_HIT_FLASH_STRENGTH * flash);
+        Image silhouette = whiteSilhouette(sprite);
+        g.drawImage(silhouette, mirror ? left + drawW : left, top, mirror ? -drawW : drawW, drawH);
+        g.setGlobalAlpha(1.0);
+    }
+
+    /** 生成一张保留 alpha、颜色全白的贴图副本；同一张原图只生成一次，之后走缓存。 */
+    private static Image whiteSilhouette(Image source) {
+        return WHITE_SILHOUETTES.computeIfAbsent(source, image -> {
+            int width = (int) image.getWidth();
+            int height = (int) image.getHeight();
+            WritableImage silhouette = new WritableImage(width, height);
+            PixelReader reader = image.getPixelReader();
+            PixelWriter writer = silhouette.getPixelWriter();
+            for (int y = 0; y < height; y++) {
+                for (int x = 0; x < width; x++) {
+                    writer.setArgb(x, y, (reader.getArgb(x, y) & 0xff000000) | 0x00ffffff);
+                }
+            }
+            return silhouette;
+        });
+    }
+
+    /**
+     * 冲刺拖尾：把冲刺途中按帧记录的残影铺在角色身后，越旧越透明，冲刺结束后自然消散。
+     *
+     * <p>残影固定取移动帧而不是当前动作帧——冲刺中角色只有"冲刺"这一个动作，
+     * 与本体共用同一套素材，看起来才像同一道残影而不是另一只角色跟着跑。
+     *
+     * <p>素材缺失时退回矢量方块：拖尾是冲刺唯一的视觉反馈，不该因为图片加载失败就整个消失。
+     */
+    private void drawDashTrail(GraphicsContext g, Player player, boolean light) {
+        List<DashTrailPoint> trail = player.getDashTrail();
+        if (trail.isEmpty()) return;
+        double directionX = player.getDashDirectionX();
+        double directionY = player.getDashDirectionY();
+        String direction = spriteDirection(directionX, directionY);
+        boolean mirror = direction.equals("left");
+        String assetDirection = mirror ? "right" : direction;
+        Map<String, Image[]> all = light ? LIGHT_FRAMES : SHADOW_FRAMES;
+        Image[] frames = all.getOrDefault("move_" + assetDirection, new Image[0]);
+        Image sprite = frames.length == 0 ? null : frames[0];
+        double drawW = 160.0;
+        double drawH = sprite == null ? 0.0 : drawW * sprite.getHeight() / Math.max(1.0, sprite.getWidth());
+        for (DashTrailPoint point : trail) {
+            // life() 从 1（刚生成）衰减到 0（消散），所以越靠后的残影越淡。
+            double alpha = GameConfig.DASH_TRAIL_ALPHA * point.life();
+            if (alpha <= 0.01) continue;
+            double left = Math.rint(point.x() - drawW / 2.0);
+            double top = Math.rint(point.y() - drawH * 0.58);
+            if (sprite != null) {
+                g.setGlobalAlpha(alpha);
+                g.drawImage(sprite, mirror ? left + drawW : left, top, mirror ? -drawW : drawW, drawH);
+            } else {
+                g.setGlobalAlpha(alpha);
+                g.setFill(light ? LIGHT_GOLD : SHADOW_VIOLET);
+                g.fillRect(Math.rint(point.x() - 13.0), Math.rint(point.y() - 18.0), 26, 36);
+            }
+        }
+        g.setGlobalAlpha(1.0);
+    }
+
+    /** 角色素材的四方向（只有左向没有独立素材，绘制时用右向镜像）。 */
+    private static String spriteDirection(double facingX, double facingY) {
+        return facingY < -0.35 ? "back" : facingY > 0.35 ? "front"
+                : facingX < 0 ? "left" : "right";
     }
 
     private void drawRoomAnnouncement(GraphicsContext g, GameSession session) {
@@ -1261,7 +1363,7 @@ public final class GameRenderer {
         g.setTextAlign(TextAlignment.CENTER);
         g.setFill(light ? Color.rgb(237, 210, 156, 0.56) : Color.rgb(198, 169, 230, 0.58));
         g.setFont(Font.font("Microsoft YaHei UI", 13));
-        g.fillText("WASD / 方向键移动    ·    鼠标瞄准 / 左键攻击    ·    E 交互    ·    TAB 穿梭双界    ·    ESC 暂停",
+        g.fillText("WASD / 方向键移动    ·    鼠标瞄准 / 左键攻击    ·    空格 闪避冲刺    ·    E 交互    ·    TAB 穿梭双界    ·    ESC 暂停",
                 AppConfig.VIEW_WIDTH / 2.0, AppConfig.VIEW_HEIGHT - 24.0);
         g.setTextAlign(TextAlignment.LEFT);
     }

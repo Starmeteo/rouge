@@ -916,7 +916,8 @@ public final class EnemySystem {
      * <p>飘字画在玩家头顶而不是弹体身上——弹体命中后立刻消失，飘在弹体位置会跟着一起没。
      */
     private void resolvePlayerHit(Player player, EnemyAttack attack) {
-        Player.DamageResult result = player.takeDamage(attack.getDamage(), attack.getDamageType());
+        Player.DamageResult result = player.takeDamage(
+                attack.getDamage(), attack.getDamageType(), attack.getX(), attack.getY());
         if (result == null) return;   // 无敌帧内或零伤害：不重复扣血，也不飘字
         boolean onShield = result.healthLost() <= 0 && result.absorbedByShield() > 0.0;
         damageFlashes.add(new DamageFlash(player.getX(), player.getY() - 62.0,

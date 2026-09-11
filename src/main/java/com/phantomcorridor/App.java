@@ -39,7 +39,7 @@ import javafx.stage.Stage;
  */
 public class App extends Application {
 
-    /** 全屏切换快捷键 1：F11 */
+    /** 全屏切换快捷A键 1：F11 */
     private static final KeyCombination FULLSCREEN_F11 = new KeyCodeCombination(KeyCode.F11);
 
     /** 全屏切换快捷键 2：Alt+Enter */
