@@ -48,7 +48,7 @@
 | 组件 | 版本/用途 |
 | --- | --- |
 | Java | 21（`--release 21`） |
-| JavaFX | 21.0.6；Controls + Media、Canvas 2D 渲染与循环 BGM |
+| JavaFX | 21.0.6；Controls + Media、Canvas 2D 渲染与循环 MP3 BGM |
 | Maven Wrapper | 构建、测试与启动 |
 | JUnit Jupiter | 5.12.1；包含 15 个核心逻辑测试类 |
 
@@ -93,7 +93,7 @@ macOS/Linux：
 ```text
 src/main/java/com/phantomcorridor
 ├── App.java / Launcher.java       # JavaFX 启动与场景编排
-├── audio/                         # BGM 调度、循环与淡入淡出
+├── audio/                         # BGM 调度、循环与淡入淡出（MP3）
 ├── config/                        # 窗口、战斗、房间与设置常量
 ├── controller/                    # 输入、游戏循环及场景控制器
 ├── core/                          # 固定步长 GameLoop 与 GameState

@@ -22,9 +22,9 @@ import java.util.EnumSet;
  */
 public final class AudioManager {
     private enum Track {
-        MENU("/com/phantomcorridor/audio/menu.flac"),
-        EXPLORATION("/com/phantomcorridor/audio/exploration.flac"),
-        BOSS("/com/phantomcorridor/audio/boss.flac");
+        MENU("/com/phantomcorridor/audio/menu.mp3"),
+        EXPLORATION("/com/phantomcorridor/audio/exploration.mp3"),
+        BOSS("/com/phantomcorridor/audio/boss.mp3");
 
         private final String resource;
 
@@ -42,6 +42,7 @@ public final class AudioManager {
 
     public AudioManager(Settings settings) {
         this.settings = settings;
+        settings.addMusicVolumeListener(this::refreshVolume);
     }
 
     /** 登录与主菜单共用主界面 BGM。 */
