@@ -263,8 +263,56 @@ public final class GameConfig {
     public static final double PLAYER_HIT_FLASH_STRENGTH = 0.9;
 
     // ---- 玩家生命 ----
-    /** 玩家最大生命值（需求未对双界版给出明确数值，沿用旧版 3 点作为占位，待 §7.2 道具加成时校调） */
-    public static final int PLAYER_MAX_HP = 5;
+    /**
+     * 玩家最大生命值。
+     *
+     * <p>从 5 点改为 100 点：旧刻度下最小伤害就是 1 点（掉 20% 血），
+     * 想区分“傀儡的践踏”和“灯魇的小弹”根本没有余量——任何差异都会被四舍五入吃掉。
+     * 100 点刻度下每次受击大约掉 4～13 点，既能读出轻重，也够铺开护盾、
+     * 吸血与后续道具加成。
+     */
+    public static final int PLAYER_MAX_HP = 100;
+
+    /**
+     * 一点「生命恢复药剂」回复的生命值（占最大生命的 10%）。
+     *
+     * <p>拾取物的 {@code amount} 是“几瓶药剂”，不是“几点血”，
+     * 因此回血量随最大生命一起写在这里，避免把 2 点血这种旧刻度的数字漏在拾取逻辑里。
+     */
+    public static final int PLAYER_HEAL_PER_PICKUP = 10;
+
+    // ---- 护盾（临时生命值） ----
+    /**
+     * 护盾容量。
+     *
+     * <p>约等于“半条命 + 一次普通小怪的伤害”：能稳定吃掉一次小怪的普通攻击，
+     * 但吃不下精英或首领的一记重招——护盾的价值是把容错从 100 点拉到 130 点左右，
+     * 而不是免死金牌。
+     */
+    public static final double PLAYER_SHIELD_CAPACITY = 30.0;
+
+    // ---- HUD：生命 / 护盾条 ----
+    /**
+     * 血条与护盾条的像素尺寸。
+     *
+     * <p>刻意不占满 HUD 面板：生命条长 200 像素，右端到面板边缘还留着约 200 像素，
+     * 一是给同排的层数/难度文字让位，二是血条一旦铺满整行就再也看不出“还差多少才满”，
+     * 护盾条也要能叠在血条上而不出框。
+     */
+    public static final double HUD_HEALTH_BAR_WIDTH = 200.0;
+    public static final double HUD_HEALTH_BAR_HEIGHT = 15.0;
+
+    /**
+     * 血条按每格多少点生命分段。
+     *
+     * <p>100 点生命配 20 点一格正好 5 格，和旧版“5 颗心”的读法对得上，
+     * 但又保留了每格内部的小数进度——掉 7 点血看得出来，不必再靠猜。
+     */
+    public static final int HUD_HEALTH_SEGMENT_VALUE = 20;
+
+    /** 护盾条高度：比血条略薄，画在血条下沿，避免两条叠在一起分不清。 */
+    public static final double HUD_SHIELD_BAR_HEIGHT = 7.0;
+
 
     // ---- 相位能量（§3.4） ----
     /** 相位能量上限 */

@@ -81,6 +81,9 @@ public final class GameSession {
         navigation.placeAtEntrance(player);
         roomContent.enterRoom(navigation.getCurrentRoom(), player);
         enemies.enterRoom(navigation.getCurrentRoom(), dungeonSeed, player, navigation);
+        // 护盾是“一层一条”的临时生命：进新一层时重置为一整条，层内打完就没有，
+        // 既不会像回血那样无限续航，也保证每层开局都有一条可用的容错。
+        player.refillShield();
         phasePulseVisibleRemaining = 0.0;
         // combatActive = false;   // 见字段处的说明：这个状态没有任何读取点
         roomAnnouncement = floorAnnouncement();
@@ -239,6 +242,9 @@ public final class GameSession {
 
     /** 守望者裂隙闪现的视觉残留；没有时返回 null。 */
     public EnemySystem.BlinkFlash getBlinkFlash() { return enemies.getBlinkFlash(); }
+
+    /** 受击飘字（玩家挨打、敌人掉血）：渲染层只读地画在头顶。 */
+    public List<EnemySystem.DamageFlash> getDamageFlashes() { return enemies.getDamageFlashes(); }
 
     /** 首领召唤裂隙（还没放出召唤物的预警圈）：渲染层画在角色之下。 */
     public List<SummonRift> getSummonRifts() { return enemies.getSummonRifts(); }
